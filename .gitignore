@@ -1,0 +1,59 @@
+# ───────────── macOS / editors ─────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+*.swp
+*~
+.vscode/
+.fleet/
+.idea/
+*.iml
+
+# ───────────── Secrets / local config ─────────────
+.env
+.env.*
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+keystore.properties
+# NotchBridge pairing keys live in ~/Library/Application Support, never in the repo
+pairing.json
+
+# ───────────── Mac app (Swift Package) ─────────────
+mac/.build/
+mac/build/
+mac/.swiftpm/
+mac/Package.resolved
+# Xcode, if the package is opened in Xcode
+xcuserdata/
+DerivedData/
+*.xcuserstate
+*.xcscmblueprint
+*.dSYM/
+*.dSYM.zip
+
+# ───────────── Android app (Gradle) ─────────────
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/app/release/
+android/captures/
+android/local.properties
+android/.externalNativeBuild/
+android/.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.hprof
+# keep the Gradle wrapper jar (needed by ./gradlew)
+!android/gradle/wrapper/gradle-wrapper.jar
+
+# ───────────── Logs / misc ─────────────
+*.log
+snapshots/

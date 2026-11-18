@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="NotchBridge"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/connection"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:textSize="16sp" />
+
+        <!-- Step 1 -->
+        <TextView style="@style/Section" android:text="1 · Notification access" />
+        <TextView android:id="@+id/accessStatus" style="@style/Body" />
+        <Button android:id="@+id/grantAccess" style="@style/Action" android:text="Open notification access settings" />
+        <TextView
+            style="@style/Hint"
+            android:text="Toggle greyed out? Tap it once, then go to Settings › Apps › NotchBridge › ⋮ › Allow restricted settings, and try again." />
+
+        <!-- Step 2 -->
+        <TextView style="@style/Section" android:text="2 · Keep it running" />
+        <TextView android:id="@+id/batteryStatus" style="@style/Body" />
+        <Button android:id="@+id/battery" style="@style/Action" android:text="Turn off battery optimisation" />
+        <Button android:id="@+id/appSettings" style="@style/Action" android:text="Open app settings (Battery › Unrestricted)" />
+        <TextView
+            style="@style/Hint"
+            android:text="Samsung: also add NotchBridge to Settings › Battery › Background usage limits › Never sleeping apps." />
+
+        <!-- Step 3 -->
+        <TextView style="@style/Section" android:text="3 · Pair with your Mac" />
+        <TextView android:id="@+id/pairStatus" style="@style/Body" />
+        <Button android:id="@+id/scan" style="@style/Action" android:text="Scan QR code on Mac" />
+        <EditText
+            android:id="@+id/pasteLink"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:hint="…or paste the pairing link (notchbridge://pair?…)"
+            android:inputType="textUri"
+            android:textSize="14sp" />
+        <Button android:id="@+id/useLink" style="@style/Action" android:text="Pair with pasted link" />
+        <Button android:id="@+id/unpair" style="@style/Action" android:text="Unpair" />
+
+        <!-- Test -->
+        <TextView style="@style/Section" android:text="Test" />
+        <Button android:id="@+id/test" style="@style/Action" android:text="Send a test notification to the Mac" />
+    </LinearLayout>
+</ScrollView>
