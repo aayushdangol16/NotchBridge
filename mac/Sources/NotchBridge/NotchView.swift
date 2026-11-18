@@ -11,8 +11,8 @@ struct NotchView: View {
     @FocusState private var replyFocused: Bool
     @State private var hovering = false
 
-    static let openWidth: CGFloat = 440
-    private let wing: CGFloat = 46            // how far the compact peek extends past each side of the notch
+    static let openWidth: CGFloat = 350
+    private let wing: CGFloat = 32            // how far the compact peek extends past each side of the notch
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -29,7 +29,7 @@ struct NotchView: View {
         switch model.phase {
         case .hidden: return (6, 10)
         case .compact: return (8, 14)
-        case .open: return (14, 30)
+        case .open: return (12, 24)
         }
     }
 
@@ -63,8 +63,8 @@ struct NotchView: View {
             ZStack {
                 Color.black
                 // soft glow of the app's colour behind the avatar
-                RadialGradient(colors: [accent.opacity(open ? 0.32 : 0), .clear],
-                               center: UnitPoint(x: 0.12, y: 0.35), startRadius: 0, endRadius: 260)
+                RadialGradient(colors: [accent.opacity(open ? 0.34 : 0), .clear],
+                               center: UnitPoint(x: 0.12, y: 0.4), startRadius: 0, endRadius: 190)
                 LinearGradient(colors: [.clear, accent.opacity(open ? 0.08 : 0)], startPoint: .top, endPoint: .bottom)
             }
         }
@@ -76,9 +76,9 @@ struct NotchView: View {
                 lineWidth: 1)
                 .opacity(open ? 1 : 0)
         }
-        .shadow(color: .black.opacity(open ? 0.55 : 0), radius: 24, y: 10)
-        .shadow(color: accent.opacity(open ? 0.18 : 0), radius: 30, y: 6)
-        .scaleEffect(hovering && open && !model.expanded ? 1.015 : 1, anchor: .top)
+        .shadow(color: .black.opacity(open ? 0.5 : 0), radius: 16, y: 8)
+        .shadow(color: accent.opacity(open ? 0.2 : 0), radius: 20, y: 4)
+        .scaleEffect(hovering && open && !model.expanded ? 1.025 : 1, anchor: .top)
         .onHover { inside in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { hovering = inside }
             model.onHover(inside)
@@ -97,61 +97,68 @@ struct NotchView: View {
             case .hidden:
                 Spacer()
             case .compact:
-                avatar(n, size: 22, badge: false)
-                    .padding(.leading, 12)
+                avatar(n, size: 18, badge: false)
+                    .padding(.leading, 9)
                 Spacer()
                 PulseDot(color: accent)
-                    .padding(.trailing, 14)
+                    .padding(.trailing, 11)
             case .open:
-                HStack(spacing: 6) {
-                    appIcon(n, size: 15)
-                    Text(n.app)
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .lineLimit(1)
+                // App name if it fits beside the camera, otherwise just the icon.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 5) {
+                        appIcon(n, size: 13)
+                        Text(n.app)
+                            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.7))
+                            .lineLimit(1)
+                            .fixedSize()
+                    }
+                    appIcon(n, size: 13)
                 }
-                .padding(.leading, 18)
-                .frame(maxWidth: sideWidth, alignment: .leading)
-                Spacer(minLength: model.notchSize.width)
-                HStack(spacing: 6) {
+                .padding(.leading, 14)
+                .frame(width: sideWidth, alignment: .leading)
+                Spacer(minLength: 0)
+                HStack(spacing: 4) {
                     if model.queued > 0 {
                         Text("+\(model.queued)")
-                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .font(.system(size: 9, weight: .heavy, design: .rounded))
                             .foregroundStyle(.black)
-                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .padding(.horizontal, 5).padding(.vertical, 1.5)
                             .background(Capsule().fill(accent))
                     }
                     Text(Self.age(n.time))
-                        .font(.system(size: 12, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.45))
+                        .lineLimit(1)
+                        .fixedSize()
                 }
-                .padding(.trailing, 18)
-                .frame(maxWidth: sideWidth, alignment: .trailing)
+                .padding(.trailing, 14)
+                .frame(width: sideWidth, alignment: .trailing)
             }
         }
         .padding(.top, 2)
     }
 
-    private var sideWidth: CGFloat { max(60, (Self.openWidth - model.notchSize.width) / 2 - 14) }
+    /// Space on each side of the camera inside the open card (card minus ears minus notch, halved).
+    private var sideWidth: CGFloat { max(40, (Self.openWidth - 2 * radii.top - model.notchSize.width) / 2) }
 
     // MARK: - Card
 
     private func card(_ n: PhoneNotification, accent: Color) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 13) {
-                avatar(n, size: 46, badge: true)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                avatar(n, size: 34, badge: true)
                     .overlay(Circle().stroke(
                         AngularGradient(colors: [accent, accent.opacity(0.2), accent], center: .center),
-                        lineWidth: 1.6).padding(-3))
-                    .padding(.top, 2)
+                        lineWidth: 1.4).padding(-2.5))
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 1) {
                     HStack(alignment: .firstTextBaseline) {
                         Text(n.title.isEmpty ? n.app : n.title)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .lineLimit(1)
-                        Spacer(minLength: 6)
+                        Spacer(minLength: 4)
                         if hovering || model.expanded {
                             CloseButton { model.onClose() }
                                 .transition(.opacity.combined(with: .scale(scale: 0.6)))
@@ -159,14 +166,13 @@ struct NotchView: View {
                     }
                     if !n.text.isEmpty {
                         Text(n.text)
-                            .font(.system(size: 13.5))
-                            .foregroundStyle(.white.opacity(0.78))
-                            .lineSpacing(1.5)
-                            .lineLimit(model.expanded ? 10 : 3)
+                            .font(.system(size: 12, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.75))
+                            .lineLimit(model.expanded ? 8 : 2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let sub = n.sub, !sub.isEmpty, model.expanded {
-                        Text(sub).font(.system(size: 11.5)).foregroundStyle(.white.opacity(0.45))
+                        Text(sub).font(.system(size: 10.5, design: .rounded)).foregroundStyle(.white.opacity(0.45))
                     }
                 }
             }
@@ -181,7 +187,7 @@ struct NotchView: View {
                     Image(systemName: model.feedbackIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                     Text(feedback)
                 }
-                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                 .foregroundStyle(model.feedbackIsError ? Color.orange : Color.green)
                 .frame(maxWidth: .infinity)
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
@@ -193,7 +199,7 @@ struct NotchView: View {
                     .transition(.opacity.combined(with: .move(edge: .top)))
             } else if hovering {
                 Text("Click for actions")
-                    .font(.system(size: 10.5, weight: .medium, design: .rounded))
+                    .font(.system(size: 9.5, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.35))
                     .frame(maxWidth: .infinity)
                     .transition(.opacity)
@@ -201,9 +207,9 @@ struct NotchView: View {
 
             CountdownBar(deadline: model.hideDeadline, duration: model.hideDuration, color: accent)
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 10)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 13)
+        .padding(.top, 5)
+        .padding(.bottom, 9)
     }
 
     // MARK: - Pieces
@@ -232,11 +238,11 @@ struct NotchView: View {
 
             if badge, n.largeIcon != nil, let icon {
                 Image(nsImage: icon).resizable().scaledToFit()
-                    .frame(width: size * 0.4, height: size * 0.4)
-                    .clipShape(RoundedRectangle(cornerRadius: size * 0.1, style: .continuous))
+                    .frame(width: size * 0.42, height: size * 0.42)
+                    .clipShape(Circle())
                     .padding(1.5)
-                    .background(RoundedRectangle(cornerRadius: size * 0.12, style: .continuous).fill(.black))
-                    .offset(x: 4, y: 4)
+                    .background(Circle().fill(.black))
+                    .offset(x: 3, y: 3)
             }
         }
     }
@@ -253,7 +259,7 @@ struct NotchView: View {
     }
 
     private func actionRow(_ n: PhoneNotification, accent: Color) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             if n.replyAction != nil {
                 IslandButton(title: "Reply", icon: "arrowshape.turn.up.left.fill", style: .primary(accent)) {
                     model.replying = true
@@ -261,11 +267,12 @@ struct NotchView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { replyFocused = true }
                 }
             }
-            ForEach(n.buttonActions.prefix(2), id: \.self) { a in
+            ForEach(n.buttonActions.prefix(1), id: \.self) { a in
                 IslandButton(title: a.title, icon: nil, style: .secondary) { model.onAction(n, a) }
             }
             Spacer(minLength: 0)
-            IslandButton(title: "Dismiss", icon: "xmark", style: .destructive) { model.onDismiss(n) }
+            IslandButton(title: "Clear", icon: "xmark", style: .destructive) { model.onDismiss(n) }
+                .help("Dismiss on the phone too")
         }
     }
 
@@ -275,24 +282,24 @@ struct NotchView: View {
             TextField("", text: $model.replyText, prompt: Text(action.title.isEmpty ? "Reply…" : "\(action.title)…")
                 .foregroundStyle(.white.opacity(0.35)))
                 .textFieldStyle(.plain)
-                .font(.system(size: 13.5))
+                .font(.system(size: 12, design: .rounded))
                 .foregroundStyle(.white)
                 .focused($replyFocused)
                 .onSubmit { send(n, action) }
                 .onExitCommand { model.replying = false }
             Button { send(n, action) } label: {
                 Image(systemName: "arrow.up")
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 11, weight: .heavy))
                     .foregroundStyle(empty ? .white.opacity(0.4) : .black)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 22, height: 22)
                     .background(Circle().fill(empty ? Color.white.opacity(0.12) : accent))
             }
             .buttonStyle(.plain)
             .disabled(empty)
         }
-        .padding(.leading, 14)
-        .padding(.trailing, 4)
-        .padding(.vertical, 4)
+        .padding(.leading, 11)
+        .padding(.trailing, 3)
+        .padding(.vertical, 3)
         .background(Capsule().fill(.white.opacity(0.09)))
         .overlay(Capsule().stroke(accent.opacity(replyFocused ? 0.6 : 0.15), lineWidth: 1))
     }
@@ -323,10 +330,10 @@ private struct PulseDot: View {
 
     var body: some View {
         ZStack {
-            Circle().fill(color.opacity(0.35)).frame(width: 14, height: 14)
-                .scaleEffect(on ? 1.25 : 0.6).opacity(on ? 0 : 1)
-            Circle().fill(color).frame(width: 7, height: 7)
-                .shadow(color: color, radius: 4)
+            Circle().fill(color.opacity(0.35)).frame(width: 12, height: 12)
+                .scaleEffect(on ? 1.3 : 0.6).opacity(on ? 0 : 1)
+            Circle().fill(color).frame(width: 6, height: 6)
+                .shadow(color: color, radius: 3)
         }
         .onAppear {
             withAnimation(.easeOut(duration: 1.1).repeatForever(autoreverses: false)) { on = true }
@@ -355,7 +362,7 @@ private struct CountdownBar: View {
                         .opacity(deadline == nil ? 0.35 : 1)
                 }
             }
-            .frame(height: 3)
+            .frame(height: 2)
         }
     }
 }
@@ -367,9 +374,9 @@ private struct CloseButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: "xmark")
-                .font(.system(size: 8.5, weight: .heavy))
+                .font(.system(size: 7, weight: .heavy))
                 .foregroundStyle(.white.opacity(hover ? 0.9 : 0.55))
-                .frame(width: 18, height: 18)
+                .frame(width: 15, height: 15)
                 .background(Circle().fill(.white.opacity(hover ? 0.2 : 0.1)))
         }
         .buttonStyle(.plain)
@@ -389,13 +396,13 @@ private struct IslandButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                if let icon { Image(systemName: icon).font(.system(size: 10, weight: .bold)) }
-                Text(title).font(.system(size: 12, weight: .semibold, design: .rounded)).lineLimit(1)
+            HStack(spacing: 4) {
+                if let icon { Image(systemName: icon).font(.system(size: 8.5, weight: .heavy)) }
+                Text(title).font(.system(size: 11, weight: .semibold, design: .rounded)).lineLimit(1)
             }
             .foregroundStyle(foreground)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
             .background(Capsule().fill(background))
             .scaleEffect(hover ? 1.04 : 1)
         }

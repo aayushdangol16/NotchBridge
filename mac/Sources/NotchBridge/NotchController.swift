@@ -53,7 +53,7 @@ final class NotchModel: ObservableObject {
 }
 
 final class NotchController {
-    static let panelSize = CGSize(width: 520, height: 340)
+    static let panelSize = CGSize(width: 420, height: 260)
     static let displaySeconds: TimeInterval = 6
     static let peekSeconds: TimeInterval = 0.55
 
@@ -140,11 +140,11 @@ final class NotchController {
 
         // 1) peek out of the notch with the app icon, 2) bloom into the full card.
         DispatchQueue.main.async {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) { self.model.phase = .compact }
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.62)) { self.model.phase = .compact }
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekSeconds) { [weak self] in
             guard let self, token == self.hideToken else { return }
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.76)) { self.model.phase = .open }
+            withAnimation(.spring(response: 0.46, dampingFraction: 0.68)) { self.model.phase = .open }
         }
         scheduleHide(after: Self.displaySeconds + Self.peekSeconds)
     }
