@@ -6,6 +6,7 @@ import SwiftUI
 final class NotchPanel: NSPanel {
     init() {
         super.init(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        isFloatingPanel = true
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
@@ -84,7 +85,18 @@ final class NotchController {
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in self?.reposition() }
+        // Fullscreen apps live in their own Space. Re-assert the panel whenever the Space changes
+        // so it is always present in the one the user is looking at.
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in self?.panel.orderFrontRegardless() }
+
         reposition()
+        // The panel stays on screen for the app's whole life (transparent and click-through when idle).
+        // Ordering it out and back in makes macOS pin it to one desktop, so it would never appear
+        // over fullscreen apps.
+        panel.ignoresMouseEvents = true
+        panel.orderFrontRegardless()
     }
 
     func show(_ n: PhoneNotification) {
@@ -135,6 +147,7 @@ final class NotchController {
         model.replyText = ""
         model.feedback = nil
         model.phase = .hidden
+        panel.ignoresMouseEvents = false
         panel.orderFrontRegardless()
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
 
@@ -166,7 +179,8 @@ final class NotchController {
                 self.queue.removeFirst()
                 self.present(next)
             } else {
-                self.panel.orderOut(nil)
+                // Keep it ordered in (see init); just stop it from catching clicks.
+                self.panel.ignoresMouseEvents = true
             }
         }
     }
