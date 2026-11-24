@@ -74,6 +74,74 @@ enum ShelfDrop {
         }
     }
 
+    /// Same as above, straight from a drag pasteboard (used by the notch drop zone).
+    static func loadURLs(from pb: NSPasteboard, completion: @escaping ([URL]) -> Void) {
+        try? FileManager.default.createDirectory(at: filesDirectory, withIntermediateDirectories: true)
+        DebugLog.write("drop: pasteboard types=\((pb.types ?? []).prefix(6).map(\.rawValue))")
+
+        // 1. Real files
+        let files = (pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        if !files.isEmpty {
+            DebugLog.write("drop: \(files.count) file(s) from pasteboard")
+            completion(files)
+            return
+        }
+
+        // 2. Promised files (Mail / Messages attachments, Photos, screenshot thumbnail, browser images)
+        let receivers = (pb.readObjects(forClasses: [NSFilePromiseReceiver.self], options: nil) as? [NSFilePromiseReceiver]) ?? []
+        if !receivers.isEmpty {
+            let group = DispatchGroup()
+            let lock = NSLock()
+            var urls: [URL] = []
+            let queue = OperationQueue()
+            for r in receivers {
+                let expected = max(1, r.fileNames.count)
+                for _ in 0..<expected { group.enter() }
+                var remaining = expected
+                r.receivePromisedFiles(atDestination: filesDirectory, options: [:], operationQueue: queue) { url, error in
+                    lock.lock()
+                    if error == nil { urls.append(url) } else { DebugLog.write("drop: promise failed: \(error!.localizedDescription)") }
+                    let leave = remaining > 0
+                    remaining -= 1
+                    lock.unlock()
+                    if leave { group.leave() }
+                }
+            }
+            let done = { DebugLog.write("drop: \(urls.count) promised file(s)"); completion(urls) }
+            if group.wait(timeout: .now() + 0) == .success { done() } else {
+                DispatchQueue.global().async {
+                    _ = group.wait(timeout: .now() + 15)
+                    DispatchQueue.main.async(execute: done)
+                }
+            }
+            return
+        }
+
+        // 3. Raw image
+        if let image = NSImage(pasteboard: pb), let tiff = image.tiffRepresentation,
+           let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) {
+            let dest = uniqueURL(base: "Dropped image", ext: "png")
+            if (try? png.write(to: dest)) != nil {
+                completion([dest])
+                return
+            }
+        }
+
+        // 4. Web link
+        if let links = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL],
+           let link = links.first(where: { $0.scheme?.hasPrefix("http") == true }) {
+            let dest = uniqueURL(base: link.host ?? "Link", ext: "webloc")
+            let plist: [String: String] = ["URL": link.absoluteString]
+            if let data = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0),
+               (try? data.write(to: dest)) != nil {
+                completion([dest])
+                return
+            }
+        }
+        DebugLog.write("drop: nothing usable on the pasteboard")
+        completion([])
+    }
+
     private static func uniqueURL(base: String, ext: String) -> URL {
         let clean = base.replacingOccurrences(of: "/", with: "-")
         var url = filesDirectory.appendingPathComponent(clean).appendingPathExtension(ext)

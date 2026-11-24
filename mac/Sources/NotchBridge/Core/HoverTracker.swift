@@ -58,7 +58,8 @@ final class HoverTracker {
         let p = NSEvent.mouseLocation
         // A file drag = left button held + the drag pasteboard changed since the button went down
         // and it carries file URLs. (Only touched while the button is down, so it's cheap.)
-        let pressed = NSEvent.pressedMouseButtons & 1 != 0
+        // Two readings: during some drags one of them reports "not pressed".
+        let pressed = NSEvent.pressedMouseButtons & 1 != 0 || CGEventSource.buttonState(.hidSystemState, button: .left)
         var fileDrag = false
         if pressed {
             let pb = NSPasteboard(name: .drag)

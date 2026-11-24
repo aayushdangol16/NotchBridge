@@ -84,7 +84,10 @@ struct IslandView: View {
             model.onDropProviders(providers)
             return true
         }
-        .onChange(of: model.dropTargeted) { _, on in DebugLog.write("drag: over island = \(on)") }
+        .onChange(of: model.dropTargeted) { _, on in
+            DebugLog.write("drag: over island = \(on)")
+            if on { model.onDragActivity() }
+        }
         .onTapGesture {
             if model.mode == .peek || model.mode == .idle { model.onOpenDashboard() }
         }

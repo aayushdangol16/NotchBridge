@@ -108,6 +108,7 @@ final class IslandModel: ObservableObject {
     var onJoin: (URL) -> Void = { _ in }
     var onDropProviders: ([NSItemProvider]) -> Void = { _ in }
     var onDropFiles: ([URL]) -> Void = { _ in }
+    var onDragActivity: () -> Void = {}
     var onShelfRemove: (ShelfItem) -> Void = { _ in }
     var onShelfClear: () -> Void = {}
     var onShelfOpen: (ShelfItem) -> Void = { _ in }

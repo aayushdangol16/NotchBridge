@@ -236,10 +236,37 @@ enum SelfTest {
         shelf.remove(shelf.items[0])
         check("remove", shelf.items.count == 1)
 
-        // Drop handler: a real file, raw image data (like a browser image), and a web link.
         let savedDir = ShelfDrop.filesDirectory
         ShelfDrop.filesDirectory = tmp.appendingPathComponent("Shelf Files")
         defer { ShelfDrop.filesDirectory = savedDir }
+
+        // Notch drop zone: macOS reports a drag over the notch -> Shelf opens.
+        c.pointerMoved(far); spin(0.5)
+        c.dragArrived(); spin(0.4)
+        check("drag over the notch opens the Shelf", m.mode == .open && m.tab == .shelf)
+        c.pointerMoved(far); spin(0.7)
+        check("stays open right after the drag (hold-open)", m.mode == .open)
+        spin(1.6)
+        check("closes once the drag is over and the pointer is away", m.mode == .idle)
+        m.tab = .home
+
+        // Pasteboard reader (drop zone path), on a private pasteboard.
+        let pb = NSPasteboard(name: NSPasteboard.Name("notchbridge.selftest.\(UUID().uuidString)"))
+        pb.clearContents()
+        pb.writeObjects([f1 as NSURL])
+        var fromPB: [URL]?
+        ShelfDrop.loadURLs(from: pb) { fromPB = $0 }
+        for _ in 0..<20 where fromPB == nil { spin(0.05) }
+        check("drop zone reads a dragged Finder file", fromPB?.map(\.lastPathComponent) == ["report.pdf"])
+        pb.clearContents()
+        pb.writeObjects([NSURL(string: "https://example.org/x")!])
+        fromPB = nil
+        ShelfDrop.loadURLs(from: pb) { fromPB = $0 }
+        for _ in 0..<20 where fromPB == nil { spin(0.05) }
+        check("drop zone saves a dragged link as .webloc", fromPB?.first?.pathExtension == "webloc")
+        pb.releaseGlobally()
+
+        // Drop handler: a real file, raw image data (like a browser image), and a web link.
         let pngData = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 4, bitsPerSample: 8,
                                        samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
                                        bytesPerRow: 0, bitsPerPixel: 0)!.representation(using: .png, properties: [:])!

@@ -19,6 +19,10 @@ final class IslandController {
     private var pointer = CGPoint(x: -10_000, y: -10_000)
     private(set) var pointerInside = false
     private var fileDragging = false
+    private let dropZone = NotchDropZone()
+    /// Keep the dashboard open this long after the last sign of a drag (so it can't close mid-drag).
+    private var dragHoldUntil = Date.distantPast
+    private var holdingForDrag: Bool { fileDragging || Date() < dragHoldUntil }
 
     // Activity
     private var queue: [PhoneNotification] = []      // arrived while the user was busy with a card
@@ -50,7 +54,19 @@ final class IslandController {
         // Fullscreen apps live in their own Space; re-assert the panel in whichever Space is active.
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in self?.panel.orderFrontRegardless() }
+        ) { [weak self] _ in
+            self?.dropZone.reassert()
+            self?.panel.orderFrontRegardless()
+        }
+
+        dropZone.onDragEnter = { [weak self] in self?.dragArrived() }
+        dropZone.onDragActivity = { [weak self] in self?.dragHoldUntil = Date().addingTimeInterval(1.5) }
+        dropZone.onDrop = { [weak self] pb in
+            ShelfDrop.loadURLs(from: pb) { urls in
+                guard let self, !urls.isEmpty else { return }
+                self.model.onDropFiles(urls)
+            }
+        }
 
         reposition()
         panel.orderFrontRegardless()
@@ -77,6 +93,7 @@ final class IslandController {
         }
         model.onOpenDashboard = { [weak self] in self?.openDashboard() }
         model.onOpenNotification = { [weak self] n in self?.openInPhoneTab(n) }
+        model.onDragActivity = { [weak self] in self?.dragHoldUntil = Date().addingTimeInterval(1.5) }
         model.onDropProviders = { [weak self] providers in
             ShelfDrop.loadURLs(providers) { urls in
                 guard let self, !urls.isEmpty else { return }
@@ -167,7 +184,16 @@ final class IslandController {
         case .open:
             let work = DispatchWorkItem { [weak self] in
                 // Don't yank the dashboard away from someone typing a reply in it.
-                guard let self, !self.pointerInside, self.model.rowReplyKey == nil, !self.fileDragging else { return }
+                guard let self, !self.pointerInside, self.model.rowReplyKey == nil else { return }
+                if self.holdingForDrag {
+                    // A file is still being dragged: check again shortly instead of closing now.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                        guard let self, self.model.mode == .open, !self.pointerInside else { return }
+                        self.pointerExited()
+                    }
+                    return
+                }
+                self.model.fileDragActive = false
                 self.closeDashboard()
             }
             closeWork = work
@@ -234,6 +260,21 @@ final class IslandController {
     }
 
     // MARK: - Dashboard
+
+    /// macOS says a file is being dragged over the notch: open the Shelf so it can be dropped.
+    func dragArrived() {
+        dragHoldUntil = Date().addingTimeInterval(1.5)
+        model.fileDragActive = true
+        if model.mode == .activity { return }
+        if model.mode == .open {
+            if model.tab != .shelf { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { model.tab = .shelf } }
+        } else {
+            DebugLog.write("drag: over the notch -> opening Shelf")
+            openDashboard(tab: .shelf)
+        }
+        // If the file is released elsewhere without ever coming onto the island, close after the hold.
+        if model.mode == .open && !pointerInside { pointerExited() }
+    }
 
     func openDashboard(tab: IslandModel.Tab? = nil) {
         guard model.mode != .activity, model.mode != .open else { return }
@@ -480,5 +521,7 @@ final class IslandController {
         model.notchSize = geometry.notchSize
         model.hasNotch = geometry.hasNotch
         panel.setFrame(geometry.topCenterRect(Self.panelSize), display: true)
+        // Drop zone: the notch plus 20 pt each side, full notch height.
+        dropZone.place(over: geometry.topCenterRect(CGSize(width: geometry.notchSize.width + 40, height: geometry.notchSize.height)))
     }
 }
