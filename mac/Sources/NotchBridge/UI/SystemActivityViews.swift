@@ -143,25 +143,25 @@ struct MeetingCard: View {
             HStack(alignment: .top, spacing: 10) {
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
                     .fill(accent)
-                    .frame(width: 4, height: 36)
+                    .frame(width: 4, height: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline) {
                         Text(event.title)
-                            .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
-                            .lineLimit(2)
+                            .lineLimit(1)
                         Spacer(minLength: 4)
-                        if model.hovering {
-                            CloseButton { model.onCloseActivity() }
-                                .transition(.opacity.combined(with: .scale(scale: 0.6)))
-                        }
+                        CloseButton { model.onCloseActivity() }
+                            .opacity(model.hovering ? 1 : 0)
+                            .allowsHitTesting(model.hovering)
                     }
                     Text([timeRange(event), event.location].compactMap { $0 }.joined(separator: " · "))
-                        .font(.system(size: 11, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.6))
-                        .lineLimit(1)
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.65))
+                        .lineLimit(2, reservesSpace: true)
                 }
             }
+            .frame(height: NotificationCard.contentRowHeight, alignment: .top)
             HStack(spacing: 6) {
                 if let url = event.joinURL {
                     IslandButton(title: "Join", icon: "video.fill", style: .primary(accent)) {
@@ -175,11 +175,12 @@ struct MeetingCard: View {
                     .foregroundStyle(.white.opacity(0.35))
                     .lineLimit(1)
             }
+            .frame(height: NotificationCard.actionRowHeight)
             CountdownBar(deadline: model.hideDeadline, duration: model.hideDuration, color: accent)
         }
         .padding(.horizontal, 13)
         .padding(.top, 6)
-        .padding(.bottom, 9)
-        .animation(.easeOut(duration: 0.2), value: model.hovering)
+        .padding(.bottom, 10)
+        .animation(.easeOut(duration: 0.15), value: model.hovering)
     }
 }

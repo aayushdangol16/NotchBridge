@@ -100,6 +100,8 @@ final class IslandModel: ObservableObject {
     var onOpenSettings: () -> Void = {}
     var onPairPhone: () -> Void = {}
     var onReshow: (PhoneNotification) -> Void = { _ in }
+    /// Click on a notification card: open it (full text, all actions) in the dashboard's Phone tab.
+    var onOpenNotification: (PhoneNotification) -> Void = { _ in }
     var onRing: (Bool) -> Void = { _ in }              // true = ring, false = stop
     var onMedia: (MediaCommand) -> Void = { _ in }
     var onClearAll: () -> Void = {}

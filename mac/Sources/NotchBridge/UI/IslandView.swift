@@ -98,26 +98,13 @@ struct IslandView: View {
         }
         .padding(.horizontal, radii.top)
         .frame(width: width, alignment: .top)
-        .background {
-            ZStack {
-                Color.black
-                RadialGradient(colors: [accent.opacity(isCard ? 0.34 : 0), .clear],
-                               center: UnitPoint(x: 0.12, y: 0.4), startRadius: 0, endRadius: 190)
-                LinearGradient(colors: [.clear, accent.opacity(isCard ? 0.08 : 0)], startPoint: .top, endPoint: .bottom)
-            }
-        }
+        // Pure black, one piece with the hardware notch: no tint, no outline, no hover growth.
+        // (Colour lives only in small details: avatar ring, buttons, countdown.)
+        .background(Color.black)
         .clipShape(shape)
-        .overlay {
-            shape.stroke(
-                LinearGradient(colors: [.clear, .white.opacity(model.hovering ? 0.2 : 0.11)], startPoint: .top, endPoint: .bottom),
-                lineWidth: 1)
-                .opacity(elevated ? 1 : 0)
-        }
-        .shadow(color: .black.opacity(elevated ? 0.5 : 0), radius: 16, y: 8)
-        .shadow(color: accent.opacity(isCard ? 0.2 : 0), radius: 20, y: 4)
+        .shadow(color: .black.opacity(elevated ? 0.45 : 0), radius: 14, y: 6)
         // Idle: invisible — the hardware notch is the island. (On Macs without a notch, nothing at all.)
         .opacity(model.mode == .idle && !model.liveVisible ? 0 : 1)
-        .scaleEffect(model.hovering && isCard && !model.expanded ? 1.025 : 1, anchor: .top)
         .overlay {
             // Drop highlight while a file is dragged over the island.
             shape.stroke(Color.green.opacity(model.dropTargeted ? 0.85 : 0), lineWidth: 2)

@@ -77,6 +77,7 @@ final class IslandController {
             self.panel.makeKey()
         }
         model.onOpenDashboard = { [weak self] in self?.openDashboard() }
+        model.onOpenNotification = { [weak self] n in self?.openInPhoneTab(n) }
         model.onDropProviders = { [weak self] providers in
             ShelfDrop.loadURLs(providers) { urls in
                 guard let self, !urls.isEmpty else { return }
@@ -225,10 +226,7 @@ final class IslandController {
         case (.idle, true), (.peek, true):
             openDashboard()
         case (.activity, true):
-            if model.stage == .full && !model.expanded {
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) { model.expanded = true }
-                model.onExpandCard()
-            }
+            if let n = model.notification { openInPhoneTab(n) }
         case (.open, false):
             closeDashboard()
         case (.activity, false):
@@ -343,15 +341,27 @@ final class IslandController {
         model.replying = false
         model.replyText = ""
         model.feedback = nil
-        model.stage = .compact
-        setMode(.activity, .spring(response: 0.38, dampingFraction: 0.62))
+        // One continuous spring straight out of the notch into the (fixed-size) card.
+        model.stage = .full
+        setMode(.activity, .spring(response: 0.48, dampingFraction: 0.82))
         haptic()
-        // 1) peek out of the notch with the avatar, 2) bloom into the full card.
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekSeconds) { [weak self] in
-            guard let self, t == self.token else { return }
-            withAnimation(.spring(response: 0.46, dampingFraction: 0.68)) { self.model.stage = .full }
-        }
-        scheduleHide(after: Prefs.displaySeconds + Self.peekSeconds)
+        _ = t
+        scheduleHide(after: Prefs.displaySeconds)
+    }
+
+    /// Leave the card and show the notification in the dashboard's Phone tab (full text, all actions).
+    func openInPhoneTab(_ n: PhoneNotification) {
+        cancelHide()
+        token += 1
+        queue.removeAll()
+        model.queued = 0
+        model.notification = nil
+        model.system = nil
+        model.replying = false
+        model.feedback = nil
+        model.tab = .phone
+        model.openRowKey = n.key
+        setMode(.open, .spring(response: 0.45, dampingFraction: 0.8))
     }
 
     /// Show a Mac-side activity (charging, low battery, upcoming meeting).
@@ -383,16 +393,12 @@ final class IslandController {
         model.replying = false
         model.feedback = nil
         model.queued = 0
-        model.stage = .compact
-        setMode(.activity, .spring(response: 0.38, dampingFraction: 0.62))
+        // Cards (meetings) open in one spring like notifications; battery/volume stay a compact strip.
+        model.stage = a.hasCard ? .full : .compact
+        setMode(.activity, .spring(response: 0.48, dampingFraction: 0.82))
         haptic()
-        if a.hasCard {
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekSeconds) { [weak self] in
-                guard let self, t == self.token else { return }
-                withAnimation(.spring(response: 0.46, dampingFraction: 0.68)) { self.model.stage = .full }
-            }
-        }
-        scheduleHide(after: a.duration + (a.hasCard ? Self.peekSeconds : 0))
+        _ = t
+        scheduleHide(after: a.duration)
     }
 
     func hideActivity() {

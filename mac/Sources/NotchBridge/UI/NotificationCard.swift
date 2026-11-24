@@ -1,7 +1,15 @@
 import AppKit
 import SwiftUI
 
-/// The full phone-notification card (activity, stage .full).
+/// The phone-notification card. Fixed size: every notification, with or without actions, short or long,
+/// hovered or not, has exactly the same footprint, so the island never jumps.
+///
+///   ┌────────────────────────────────────────┐  ← strip beside the camera (app icon · time)
+///   │ (avatar)  Title                    ✕   │  row: fixed 40 pt
+///   │           Text, always 2 lines         │
+///   │ [Reply] [Action]              [Clear]  │  row: fixed 26 pt (or reply field / status)
+///   │ ─────────────── countdown ──────────── │
+///   └────────────────────────────────────────┘
 struct NotificationCard: View {
     @ObservedObject var model: IslandModel
     let n: PhoneNotification
@@ -9,76 +17,68 @@ struct NotificationCard: View {
     let ns: Namespace.ID
     @FocusState private var replyFocused: Bool
 
+    static let contentRowHeight: CGFloat = 48
+    static let actionRowHeight: CGFloat = 26
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 10) {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .top, spacing: 10) {
                 AvatarView(n: n, size: 34, badge: true, appIcon: model.appIcon(n.pkg), accent: model.accent(n.pkg))
                     .matchedGeometryEffect(id: "avatar", in: ns)
-                    .overlay(Circle().stroke(
-                        AngularGradient(colors: [accent, accent.opacity(0.2), accent], center: .center),
-                        lineWidth: 1.4).padding(-2.5))
+                    .overlay(Circle().stroke(accent.opacity(0.9), lineWidth: 1.4).padding(-2.5))
+                    .padding(.top, 2)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    HStack(alignment: .firstTextBaseline) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
                         Text(n.title.isEmpty ? n.app : n.title)
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundStyle(.white)
                             .lineLimit(1)
                         Spacer(minLength: 4)
-                        if model.hovering || model.expanded {
-                            CloseButton { model.onCloseActivity() }
-                                .transition(.opacity.combined(with: .scale(scale: 0.6)))
-                        }
+                        // Always laid out (only faded) so hovering never shifts anything.
+                        CloseButton { model.onCloseActivity() }
+                            .opacity(model.hovering ? 1 : 0)
+                            .allowsHitTesting(model.hovering)
                     }
-                    if !n.text.isEmpty {
-                        Text(n.text)
-                            .font(.system(size: 12, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.75))
-                            .lineLimit(model.expanded ? 8 : 2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if let sub = n.sub, !sub.isEmpty, model.expanded {
-                        Text(sub).font(.system(size: 10.5, design: .rounded)).foregroundStyle(.white.opacity(0.45))
-                    }
+                    Text(n.text.isEmpty ? " " : n.text)
+                        .font(.system(size: 12, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.72))
+                        .lineLimit(2, reservesSpace: true)
                 }
             }
+            .frame(height: Self.contentRowHeight, alignment: .top)
             .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) { model.expanded.toggle() }
-                if model.expanded { model.onExpandCard() }
-            }
+            .onTapGesture { model.onOpenNotification(n) }
+            .help("Click to open it in the Phone tab")
 
-            if let feedback = model.feedback {
-                HStack(spacing: 7) {
-                    Image(systemName: model.feedbackIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                    Text(feedback)
-                }
-                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(model.feedbackIsError ? Color.orange : Color.green)
-                .frame(maxWidth: .infinity)
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
-            } else if model.replying, let reply = n.replyAction {
-                replyField(reply)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-            } else if model.expanded {
-                actionRow
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            } else if model.hovering {
-                Text("Click for actions · swipe up to hide")
-                    .font(.system(size: 9.5, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.35))
+            ZStack(alignment: .leading) {
+                if let feedback = model.feedback {
+                    HStack(spacing: 7) {
+                        Image(systemName: model.feedbackIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                        Text(feedback).lineLimit(1)
+                    }
+                    .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(model.feedbackIsError ? Color.orange : Color.green)
                     .frame(maxWidth: .infinity)
                     .transition(.opacity)
+                } else if model.replying, let reply = n.replyAction {
+                    replyField(reply)
+                        .transition(.opacity)
+                } else {
+                    actionRow
+                        .transition(.opacity)
+                }
             }
+            .frame(height: Self.actionRowHeight)
 
             CountdownBar(deadline: model.hideDeadline, duration: model.hideDuration, color: accent)
         }
         .padding(.horizontal, 13)
-        .padding(.top, 5)
-        .padding(.bottom, 9)
-        .animation(.spring(response: 0.38, dampingFraction: 0.8), value: model.replying)
-        .animation(.spring(response: 0.38, dampingFraction: 0.8), value: model.feedback)
-        .animation(.easeOut(duration: 0.2), value: model.hovering)
+        .padding(.top, 6)
+        .padding(.bottom, 10)
+        .animation(.easeOut(duration: 0.18), value: model.replying)
+        .animation(.easeOut(duration: 0.18), value: model.feedback)
+        .animation(.easeOut(duration: 0.15), value: model.hovering)
     }
 
     private var actionRow: some View {
@@ -121,8 +121,8 @@ struct NotificationCard: View {
             .disabled(empty)
         }
         .padding(.leading, 11)
-        .padding(.trailing, 3)
-        .padding(.vertical, 3)
+        .padding(.trailing, 2)
+        .frame(height: Self.actionRowHeight)
         .background(Capsule().fill(.white.opacity(0.09)))
         .overlay(Capsule().stroke(accent.opacity(replyFocused ? 0.6 : 0.15), lineWidth: 1))
     }

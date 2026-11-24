@@ -78,6 +78,9 @@ enum Snapshot {
             ("04-open-offline", model(.open) { $0.phoneConnected = false; $0.recent = [] }),
             ("05-activity-compact", model(.activity) { $0.stage = .compact }),
             ("06-activity-card", model(.activity)),
+            ("06b-card-short-no-actions", model(.activity, PhoneNotification(
+                key: "9", pkg: "com.whatsapp", app: "WhatsApp", title: "Ram", text: "ok 👍", sub: nil, time: Date(),
+                actions: [], largeIcon: nil))),
             ("07-card-whatsapp-queued", model(.activity, wa) { $0.queued = 2 }),
             ("08-card-actions", model(.activity) { $0.expanded = true; $0.hovering = true; $0.hideDeadline = nil }),
             ("09-card-sent", model(.activity) { $0.feedback = "Reply sent" }),

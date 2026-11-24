@@ -1,7 +1,18 @@
 import AppKit
+import SwiftUI
 
 /// `NotchBridge --selftest` drives an invisible IslandController with synthetic pointer positions,
 /// gestures and notifications, and checks every state transition. Exit code 0 = all passed.
+/// Hosts a NotificationCard at the card's real inner width so its size can be measured.
+private struct CardProbe: View {
+    @ObservedObject var model: IslandModel
+    let n: PhoneNotification
+    @Namespace private var ns
+    var body: some View {
+        NotificationCard(model: model, n: n, accent: .blue, ns: ns).frame(width: IslandView.cardWidth - 24)
+    }
+}
+
 enum SelfTest {
     static func run() -> Int32 {
         Prefs.registerDefaults()
@@ -62,10 +73,34 @@ enum SelfTest {
         c.pointerMoved(far); spin(0.8)
         check("leaving the dashboard closes it", m.mode == .idle)
 
-        c.show(note("a", "First")); spin(0.2)
-        check("notification -> activity (compact)", m.mode == .activity && m.stage == .compact)
-        spin(0.6)
-        check("compact -> full card", m.stage == .full)
+        c.show(note("a", "First")); spin(0.6)
+        check("notification opens straight into the card (one step)", m.mode == .activity && m.stage == .full)
+        let long = PhoneNotification(key: "a", pkg: "com.test", app: "Test", title: "A much longer title that will not fit",
+                                     text: String(repeating: "A very long message that wraps onto many lines. ", count: 6),
+                                     sub: nil, time: Date(),
+                                     actions: [WireAction(i: 0, title: "Reply", reply: true), WireAction(i: 1, title: "Mark as read", reply: false)],
+                                     largeIcon: nil)
+        // Measure the card's own layout (the invisible test panel doesn't report sizes).
+        func cardSize(_ n: PhoneNotification) -> CGSize {
+            NSHostingView(rootView: CardProbe(model: m, n: n)).fittingSize
+        }
+        let shortSize = cardSize(note("s", "Hi"))
+        let longSize = cardSize(long)
+        m.hovering = true
+        let hoverSize = cardSize(long)
+        m.hovering = false
+        m.replying = true
+        let replySize = cardSize(long)
+        m.replying = false
+        m.feedback = "Reply sent"
+        let feedbackSize = cardSize(long)
+        m.feedback = nil
+        print("  card heights: short=\(shortSize.height) long=\(longSize.height) hover=\(hoverSize.height) reply=\(replySize.height) sent=\(feedbackSize.height)")
+        check("card size is uniform (short vs long text, with/without actions)",
+              shortSize.height > 60 && shortSize.height == longSize.height)
+        check("hovering, replying and the status line keep the same size",
+              hoverSize.height == shortSize.height && replySize.height == shortSize.height && feedbackSize.height == shortSize.height)
+        c.show(long); spin(0.3)
 
         c.show(note("b", "Second")); spin(0.2)
         check("burst: newest replaces card, +1", m.notification?.key == "b" && m.queued == 1)
@@ -83,6 +118,11 @@ enum SelfTest {
         m.onOpenDashboard(); spin(0.3)
         c.show(note("d", "While open")); spin(0.3)
         check("notification while dashboard open -> activity", m.mode == .activity)
+        m.onOpenNotification(m.notification!); spin(0.4)
+        check("clicking the card opens it in the Phone tab", m.mode == .open && m.tab == .phone && m.openRowKey == "d")
+        m.openRowKey = nil
+        m.tab = .home
+        c.show(note("d2", "While open again")); spin(0.3)
         c.pointerMoved(CGPoint(x: c.islandRect.midX, y: c.islandRect.midY)); spin(0.2)
         m.onCloseActivity(); spin(0.6)
         check("closing it returns to the dashboard", m.mode == .open)
