@@ -99,6 +99,24 @@ enum SelfTest {
         c.pointerMoved(far); spin(0.8)
         check("back to idle", m.mode == .idle)
 
+        var commands: [MediaCommand] = []
+        m.onMedia = { commands.append($0) }
+        m.media = NowPlaying(source: .mac, title: "Song", artist: "Artist", album: "", duration: 100, elapsed: 0,
+                             elapsedAt: Date(), rate: 1, isPlaying: true, appName: "Music", appID: "x",
+                             artwork: nil, artKey: nil)
+        spin(0.4)
+        check("music playing -> live strip while idle", m.liveVisible && m.mode == .idle)
+        c.pointerMoved(CGPoint(x: c.islandRect.maxX - 8, y: c.islandRect.midY)); spin(0.3)
+        check("hovering the live strip (beside the notch) -> peek", m.mode == .peek)
+        c.swipeHorizontal(right: false)
+        check("swipe left -> next track", commands.last == .next)
+        c.swipeHorizontal(right: true)
+        check("swipe right -> previous track", commands.last == .previous)
+        c.pointerMoved(far); spin(0.4)
+        m.media?.isPlaying = false; spin(0.3)
+        check("paused -> live strip hides", !m.liveVisible && m.mode == .idle)
+        m.media = nil
+
         print(failures == 0 ? "ALL PASSED" : "\(failures) FAILED")
         return failures == 0 ? 0 : 1
     }

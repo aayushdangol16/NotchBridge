@@ -26,6 +26,7 @@ class NotificationCaptureService : NotificationListenerService() {
         runCatching { activeNotifications }.getOrNull()?.forEach { activeKeys.add(it.key) }
         Bridge.listenerService = this
         Bridge.listenerAttached()
+        MediaWatcher.start(this, ComponentName(this, NotificationCaptureService::class.java))
         BridgeService.start(this)
     }
 

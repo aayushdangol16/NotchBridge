@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -7,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let store = NotificationStore()
     private let island = IslandController()
     private let settingsWindow = SettingsWindowController()
+    private let media = MediaCenter()
     private var cancellables = Set<AnyCancellable>()
     private let pairingWindow = PairingWindowController()
     private let systemNotifier = SystemNotifier()
@@ -23,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         if systemNotifier.enabled { systemNotifier.requestAuthorization() }
         server.start()
+        wireMedia()
 
         if Pairing.shared.pairedDevice == nil {
             pairingWindow.show()
@@ -39,7 +42,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.updateStatusIcon()
             self.island.model.phoneConnected = { if case .connected = s { return true } else { return false } }()
             self.island.model.phoneName = Pairing.shared.pairedDevice
-            if case .connected = s {} else { self.island.model.phoneRinging = false }
+            if case .connected = s {} else {
+                self.island.model.phoneRinging = false
+                self.media.phoneDisconnected()
+            }
             self.settingsWindow.model.phoneStatus = self.statusText
             if case .connected = s, self.pairingWindow.isVisible {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.pairingWindow.close() }
@@ -77,6 +83,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             island.model.phoneCharging = m.charging ?? false
         case "ringing":
             island.model.phoneRinging = m.on ?? false
+        case "media":
+            media.updatePhone(m.m)
         default:
             break
         }
@@ -251,7 +259,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openDashboard() { island.openDashboard() }
 
+    private func wireMedia() {
+        let m = island.model
+        m.liveMusicEnabled = Prefs.liveMusic
+        m.onMedia = { [weak self] cmd in self?.media.send(cmd) }
+        media.sendToPhone = { [weak self] cmd in
+            self?.server.send(MacCommand(type: "media_cmd", cmd: cmd.rawValue))
+        }
+        media.$current
+            .receive(on: DispatchQueue.main)
+            .sink { [weak m] np in withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { m?.media = np } }
+            .store(in: &cancellables)
+        media.$accent
+            .receive(on: DispatchQueue.main)
+            .sink { [weak m] c in m?.mediaAccent = c }
+            .store(in: &cancellables)
+        media.start()
+    }
+
     private func wireSettings() {
+        settingsWindow.model.onLiveMusicChanged = { [weak self] on in
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { self?.island.model.liveMusicEnabled = on }
+        }
         settingsWindow.model.phoneStatus = statusText
         settingsWindow.model.onPair = { [weak self] in self?.pairingWindow.show() }
         settingsWindow.model.onMirrorChanged = { [weak self] on in

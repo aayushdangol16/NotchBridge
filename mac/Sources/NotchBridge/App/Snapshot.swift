@@ -16,6 +16,15 @@ enum Snapshot {
         let avatar = icon(colors: [NSColor(srgbRed: 0.95, green: 0.6, blue: 0.4, alpha: 1),
                                    NSColor(srgbRed: 0.8, green: 0.35, blue: 0.45, alpha: 1)], glyph: "person.fill")
         let icons = ["com.facebook.orca": messenger, "com.whatsapp": whatsapp]
+        let albumArt = icon(colors: [NSColor(srgbRed: 0.95, green: 0.25, blue: 0.35, alpha: 1),
+                                     NSColor(srgbRed: 1, green: 0.6, blue: 0.2, alpha: 1)], glyph: "music.note", square: true)
+        let song = NowPlaying(source: .mac, title: "Blinding Lights", artist: "The Weeknd", album: "After Hours",
+                              duration: 200, elapsed: 74, elapsedAt: Date(), rate: 1, isPlaying: true,
+                              appName: "Spotify", appID: "com.spotify.client", artwork: albumArt, artKey: "a")
+        let phoneSong = NowPlaying(source: .phone, title: "Resham Firiri", artist: "Nepali Folk", album: "",
+                                   duration: 245, elapsed: 30, elapsedAt: Date(), rate: 1, isPlaying: false,
+                                   appName: "YouTube Music", appID: "com.google.android.apps.youtube.music",
+                                   artwork: nil, artKey: nil)
 
         let msg = PhoneNotification(
             key: "1", pkg: "com.facebook.orca", app: "Messenger", title: "Sita Sharma",
@@ -59,6 +68,10 @@ enum Snapshot {
             ("07-card-whatsapp-queued", model(.activity, wa) { $0.queued = 2 }),
             ("08-card-actions", model(.activity) { $0.expanded = true; $0.hovering = true; $0.hideDeadline = nil }),
             ("09-card-sent", model(.activity) { $0.feedback = "Reply sent" }),
+            ("10-idle-live-music", model(.idle) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),
+            ("11-peek-music", model(.peek) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),
+            ("12-home-music", model(.open) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),
+            ("13-home-phone-music-paused", model(.open) { $0.media = phoneSong }),
         ]
 
         for (name, m) in shots {
@@ -80,10 +93,10 @@ enum Snapshot {
         }
     }
 
-    private static func icon(colors: [NSColor], glyph: String) -> NSImage {
+    private static func icon(colors: [NSColor], glyph: String, square: Bool = false) -> NSImage {
         let size = NSSize(width: 96, height: 96)
         return NSImage(size: size, flipped: false) { rect in
-            let path = NSBezierPath(ovalIn: rect)
+            let path = square ? NSBezierPath(rect: rect) : NSBezierPath(ovalIn: rect)
             NSGradient(colors: colors.count > 1 ? colors : colors + colors)?.draw(in: path, angle: -45)
             if let sym = NSImage(systemSymbolName: glyph, accessibilityDescription: nil)?
                 .withSymbolConfiguration(.init(pointSize: 44, weight: .semibold)) {

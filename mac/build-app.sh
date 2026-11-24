@@ -7,10 +7,17 @@ cd "$(dirname "$0")"
 swift build -c release
 BIN="$(swift build -c release --show-bin-path)/NotchBridge"
 
+# Now Playing helper (loaded by /usr/bin/perl, see MediaHelper/NowPlayingHelper.m)
+mkdir -p .build/helper
+clang -dynamiclib -fobjc-arc -arch arm64 -arch x86_64 -mmacosx-version-min=14.0 -O2 \
+    -framework Foundation -o .build/helper/libNowPlayingHelper.dylib MediaHelper/NowPlayingHelper.m
+codesign --force --sign - .build/helper/libNowPlayingHelper.dylib
+
 APP="build/NotchBridge.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/NotchBridge"
+cp .build/helper/libNowPlayingHelper.dylib "$APP/Contents/Resources/"
 cp Info.plist "$APP/Contents/Info.plist"
 codesign --force --sign - "$APP"
 echo "Built $(pwd)/$APP"

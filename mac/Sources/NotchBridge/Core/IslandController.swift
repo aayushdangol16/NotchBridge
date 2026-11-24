@@ -32,6 +32,7 @@ final class IslandController {
 
     // Gestures
     private var scrollAccum: CGFloat = 0
+    private var scrollAccumX: CGFloat = 0
     private var lastGesture = Date.distantPast
 
     /// `interactive: false` builds an invisible, untracked instance for `--selftest`.
@@ -92,7 +93,13 @@ final class IslandController {
 
     func pointerMoved(_ p: CGPoint) {
         pointer = p
-        let zone = model.mode == .idle ? geometry.hotZone : islandRect.insetBy(dx: -6, dy: -6)
+        let zone: CGRect
+        if model.mode == .idle {
+            // The live music strip is visible while idle, so it is hoverable too.
+            zone = model.liveVisible ? geometry.hotZone.union(islandRect.insetBy(dx: -6, dy: -6)) : geometry.hotZone
+        } else {
+            zone = islandRect.insetBy(dx: -6, dy: -6)
+        }
         let inside = zone.contains(p)
         if inside != pointerInside {
             pointerInside = inside
@@ -151,21 +158,36 @@ final class IslandController {
 
     private func scrolled(_ e: NSEvent) {
         guard pointerInside, e.hasPreciseScrollingDeltas else { return }
-        if e.phase == .began { scrollAccum = 0 }
-        // Positive = fingers moving down, whatever the "natural scrolling" setting.
-        let dy = e.isDirectionInvertedFromDevice ? e.scrollingDeltaY : -e.scrollingDeltaY
-        scrollAccum += dy
+        if e.phase == .began { scrollAccum = 0; scrollAccumX = 0 }
+        // Positive = fingers moving down / right, whatever the "natural scrolling" setting.
+        let inverted = e.isDirectionInvertedFromDevice
+        scrollAccum += inverted ? e.scrollingDeltaY : -e.scrollingDeltaY
+        scrollAccumX += inverted ? e.scrollingDeltaX : -e.scrollingDeltaX
         guard Date().timeIntervalSince(lastGesture) > 0.5 else { return }
-        if scrollAccum > 28 {
+        if abs(scrollAccumX) > 40, abs(scrollAccumX) > abs(scrollAccum) * 1.5, model.media != nil,
+           model.mode != .activity {
+            swipeHorizontal(right: scrollAccumX > 0)
+        } else if scrollAccum > 28 {
             swipe(down: true)
         } else if scrollAccum < -28 {
             swipe(down: false)
         }
     }
 
+    /// Swipe left = next track, swipe right = previous (like flicking a card).
+    func swipeHorizontal(right: Bool) {
+        scrollAccum = 0
+        scrollAccumX = 0
+        lastGesture = Date()
+        guard model.media != nil else { return }
+        model.onMedia(right ? .previous : .next)
+        haptic()
+    }
+
     /// Swipe down opens (or expands a card), swipe up closes.
     func swipe(down: Bool) {
         scrollAccum = 0
+        scrollAccumX = 0
         lastGesture = Date()
         switch (model.mode, down) {
         case (.idle, true), (.peek, true):

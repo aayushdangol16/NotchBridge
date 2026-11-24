@@ -62,6 +62,12 @@ The notch is now a small dynamic island:
     - **Find phone** rings the phone at full alarm volume for 30 seconds, even on silent. Stop it from the Mac or from the phone's notification.
     - **Clear all** dismisses everything on the phone too.
   - Move the pointer away, click outside, or swipe up to close it.
+- **Music:** while anything plays (Spotify, Music, a YouTube video in any browser on the Mac, or Spotify / YouTube Music on the phone):
+  - The album art sits left of the camera and small dancing bars sit right of it.
+  - Hover for quick play/pause and next.
+  - Swipe left or right over the notch to skip tracks.
+  - The Home tab shows a full player with progress and controls. Music playing on the Mac takes priority over the phone.
+  - Turn it off in Settings: "Show what's playing beside the camera".
 - **New phone notifications** peek out of the notch, then open into a card that stays for about 6 seconds (adjustable in Settings). Hovering keeps it open.
   - Click the card for **Reply**, the app's own action, and **Clear** (which also removes it from the phone).
   - Swipe up to hide the card.
@@ -99,6 +105,7 @@ A client that can't decrypt is closed with code 4001, and the phone then shows "
 The key is stored in `~/Library/Application Support/NotchBridge/pairing.json` (mode 0600) on the Mac, and in the app's private storage on the phone.
 
 ## Known limits
+- **Mac music info relies on a workaround.** Since macOS 15.4, Apple only lets apps with a special permission read what's playing. NotchBridge gets around this with a small helper (`mac/MediaHelper/NowPlayingHelper.m`) loaded into `/usr/bin/perl`, which already has that permission. A future macOS could block this again. If that happens, Mac music simply disappears from the island and everything else keeps working.
 - **One-time codes.** Android 15+ may hide one-time login codes from notification-reading apps. You might see "Sensitive notification content hidden" for bank or 2FA texts.
 - **Reply** only works for apps that put a reply box in their notification.
 - **Same network only.** This version works only on the same Wi-Fi, with no Bluetooth or internet fallback.

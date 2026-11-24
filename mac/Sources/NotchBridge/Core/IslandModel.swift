@@ -43,6 +43,13 @@ final class IslandModel: ObservableObject {
     @Published var phoneRinging = false
     @Published var recent: [PhoneNotification] = []
 
+    // Media (Mac or phone)
+    @Published var media: NowPlaying?
+    @Published var mediaAccent: NSColor = AccentColor.fallback
+    @Published var liveMusicEnabled = true
+    /// While idle and music plays, the island shows a small live strip (art + bars) beside the camera.
+    var liveVisible: Bool { mode == .idle && liveMusicEnabled && (media?.isPlaying ?? false) }
+
     // Phone tab interaction
     @Published var openRowKey: String?       // row showing full text + actions
     @Published var rowReplyKey: String?      // row with an inline reply field
@@ -65,6 +72,7 @@ final class IslandModel: ObservableObject {
     var onPairPhone: () -> Void = {}
     var onReshow: (PhoneNotification) -> Void = { _ in }
     var onRing: (Bool) -> Void = { _ in }              // true = ring, false = stop
+    var onMedia: (MediaCommand) -> Void = { _ in }
     var onClearAll: () -> Void = {}
     /// A text field in the dashboard wants focus: make the panel key and keep the dashboard open.
     var onNeedKeyboard: () -> Void = {}

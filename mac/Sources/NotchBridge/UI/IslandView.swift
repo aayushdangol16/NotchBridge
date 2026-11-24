@@ -33,7 +33,7 @@ struct IslandView: View {
 
     private var radii: (top: CGFloat, bottom: CGFloat) {
         switch model.mode {
-        case .idle: return (6, 10)
+        case .idle: return model.liveVisible ? (8, 14) : (6, 10)
         case .peek: return (8, 13)
         case .activity: return model.stage == .full ? (12, 24) : (8, 14)
         case .open: return (14, 28)
@@ -43,7 +43,7 @@ struct IslandView: View {
     private var width: CGFloat {
         let notch = model.notchSize.width
         switch model.mode {
-        case .idle: return notch + 2 * radii.top
+        case .idle: return notch + 2 * (model.liveVisible ? activityWing : 0) + 2 * radii.top
         case .peek: return notch + 2 * peekWing + 2 * radii.top
         case .activity: return model.stage == .full ? Self.cardWidth : notch + 2 * activityWing + 2 * radii.top
         case .open: return Self.dashboardWidth
@@ -98,7 +98,7 @@ struct IslandView: View {
         .shadow(color: .black.opacity(elevated ? 0.5 : 0), radius: 16, y: 8)
         .shadow(color: accent.opacity(isCard ? 0.2 : 0), radius: 20, y: 4)
         // Idle: invisible — the hardware notch is the island. (On Macs without a notch, nothing at all.)
-        .opacity(model.mode == .idle ? 0 : 1)
+        .opacity(model.mode == .idle && !model.liveVisible ? 0 : 1)
         .scaleEffect(model.hovering && isCard && !model.expanded ? 1.025 : 1, anchor: .top)
         .contentShape(shape)
         .onTapGesture {
@@ -115,9 +115,9 @@ struct IslandView: View {
         HStack(spacing: 0) {
             switch model.mode {
             case .idle:
-                Spacer()
+                if model.liveVisible, let media = model.media { liveBar(media) } else { Spacer() }
             case .peek:
-                peekBar
+                if let media = model.media, media.isPlaying { mediaPeekBar(media) } else { peekBar }
             case .activity:
                 if let n = model.notification {
                     if model.stage == .compact { compactActivityBar(n) } else { cardHeaderBar(n) }
@@ -162,6 +162,37 @@ struct IslandView: View {
             .padding(.trailing, 9)
             .transition(.opacity)
         }
+    }
+
+    private var mediaAccent: Color { Color(nsColor: model.mediaAccent) }
+
+    /// Idle while music plays: album art left of the camera, dancing bars right of it.
+    private func liveBar(_ media: NowPlaying) -> some View {
+        HStack(spacing: 0) {
+            ArtworkView(media: media, size: 18, accent: mediaAccent)
+                .matchedGeometryEffect(id: "art", in: ns)
+                .padding(.leading, 9)
+            Spacer()
+            MusicBars(playing: media.isPlaying, color: mediaAccent)
+                .padding(.trailing, 11)
+        }
+        .transition(.opacity)
+    }
+
+    /// Hovered while music plays: art + quick play/pause and next.
+    private func mediaPeekBar(_ media: NowPlaying) -> some View {
+        HStack(spacing: 0) {
+            ArtworkView(media: media, size: 18, accent: mediaAccent)
+                .matchedGeometryEffect(id: "art", in: ns)
+                .padding(.leading, 9)
+            Spacer()
+            HStack(spacing: 2) {
+                MediaButton(icon: media.isPlaying ? "pause.fill" : "play.fill", size: 9) { model.onMedia(.togglePlayPause) }
+                MediaButton(icon: "forward.fill", size: 9) { model.onMedia(.next) }
+            }
+            .padding(.trailing, 4)
+        }
+        .transition(.opacity)
     }
 
     private func compactActivityBar(_ n: PhoneNotification) -> some View {

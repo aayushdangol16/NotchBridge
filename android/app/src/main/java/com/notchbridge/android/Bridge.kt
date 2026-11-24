@@ -84,6 +84,9 @@ object Bridge {
     private class Pending(val sbn: StatusBarNotification, val silent: Boolean, val alert: Boolean, val at: Long)
     private val outbox = LinkedHashMap<String, Pending>()
 
+    private var lastMedia: JSONObject? = null
+    private var mediaArtSent: String? = null      // artId already sent on this connection
+
     private var batteryLevel = -1
     private var batteryCharging = false
 
@@ -262,6 +265,8 @@ object Bridge {
                 flushOutbox()
                 sendSync()
                 sendBattery()
+                mediaArtSent = null
+                lastMedia?.let(::sendMedia)
                 if (PhoneFinder.isRinging) send(JSONObject().put("type", "ringing").put("on", true))
             }
             "ring" -> {
@@ -269,6 +274,7 @@ object Bridge {
                 send(JSONObject().put("type", "result").put("ok", true).put("msg", "Ringing your phone"))
             }
             "ring_stop" -> PhoneFinder.stop(app)
+            "media_cmd" -> MediaWatcher.command(json.optString("cmd"))
             "dismiss", "action", "reply" -> {
                 val result = listenerService?.perform(json)
                     ?: if (json.optString("type") == "dismiss") null
@@ -394,6 +400,22 @@ object Bridge {
         discovery?.let { runCatching { nsd.stopServiceDiscovery(it) } }
         discovery = null
         resolving = false
+    }
+
+    // ---- media ----
+
+    /** Latest "what's playing" from MediaWatcher; kept so it can be re-sent after a reconnect. */
+    fun media(m: JSONObject) = handler.post {
+        lastMedia = m
+        if (status.state == State.CONNECTED) sendMedia(m)
+    }
+
+    private fun sendMedia(m: JSONObject) {
+        // Artwork travels once per track per connection.
+        val payload = JSONObject(m.toString())
+        val artId = payload.optString("artId").takeIf { it.isNotEmpty() }
+        if (artId != null && artId == mediaArtSent) payload.remove("art") else mediaArtSent = artId
+        send(JSONObject().put("type", "media").put("m", payload))
     }
 
     // ---- battery ----

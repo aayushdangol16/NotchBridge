@@ -41,7 +41,18 @@ struct DashboardView: View {
     // MARK: Home
 
     private var home: some View {
-        HStack(alignment: .top, spacing: 14) {
+        HStack(alignment: .top, spacing: 12) {
+            if let media = model.media {
+                NowPlayingCard(model: model, media: media)
+                    .frame(width: 228)
+            } else {
+                clock
+            }
+            phoneCard
+        }
+    }
+
+    private var clock: some View {
             TimelineView(.everyMinute) { ctx in
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(alignment: .firstTextBaseline, spacing: 3) {
@@ -61,7 +72,9 @@ struct DashboardView: View {
                 }
             }
             .frame(width: 150, alignment: .leading)
+    }
 
+    private var phoneCard: some View {
             VStack(alignment: .leading, spacing: 8) {
                 phoneStatusRow
                 if !model.recent.isEmpty {
@@ -78,7 +91,6 @@ struct DashboardView: View {
             .padding(10)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(.white.opacity(0.06)))
-        }
     }
 
     private var phoneStatusRow: some View {

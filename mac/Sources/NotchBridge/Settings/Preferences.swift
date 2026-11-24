@@ -8,6 +8,7 @@ enum Prefs {
         static let haptics = "haptics"
         static let displaySeconds = "displaySeconds"
         static let mirrorToNotificationCenter = "mirrorToNotificationCenter"
+        static let liveMusic = "liveMusic"
     }
 
     static func registerDefaults() {
@@ -17,6 +18,7 @@ enum Prefs {
             Key.haptics: true,
             Key.displaySeconds: 6.0,
             Key.mirrorToNotificationCenter: false,
+            Key.liveMusic: true,
         ])
     }
 
@@ -25,4 +27,5 @@ enum Prefs {
     static var openOnHover: Bool { d.bool(forKey: Key.openOnHover) }
     static var haptics: Bool { d.bool(forKey: Key.haptics) }
     static var displaySeconds: TimeInterval { max(2, d.double(forKey: Key.displaySeconds)) }
+    static var liveMusic: Bool { d.bool(forKey: Key.liveMusic) }
 }

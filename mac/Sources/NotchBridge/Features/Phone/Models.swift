@@ -31,7 +31,7 @@ struct WireNotification: Codable {
 
 /// Phone -> Mac
 struct PhoneMessage: Decodable {
-    let type: String            // hello | posted | removed | sync | result | battery | ringing
+    let type: String            // hello | posted | removed | sync | result | battery | ringing | media
     let device: String?
     let model: String?
     let n: WireNotification?
@@ -42,15 +42,17 @@ struct PhoneMessage: Decodable {
     let level: Int?             // battery: percent
     let charging: Bool?         // battery
     let on: Bool?               // ringing (find my phone)
+    let m: WireMedia?           // media: what's playing on the phone
 }
 
 /// Mac -> Phone
 struct MacCommand: Encodable {
-    let type: String            // welcome | dismiss | action | reply | ring | ring_stop
+    let type: String            // welcome | dismiss | action | reply | ring | ring_stop | media_cmd
     var key: String? = nil
     var i: Int? = nil
     var text: String? = nil
     var name: String? = nil
+    var cmd: String? = nil      // media_cmd: toggle | next | prev
 }
 
 // MARK: - App model
