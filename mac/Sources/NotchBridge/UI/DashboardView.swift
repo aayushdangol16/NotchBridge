@@ -72,7 +72,8 @@ struct DashboardView: View {
                     Text(ctx.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
                         .font(.system(size: 11.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.5))
-                    if let next = model.events.first(where: { !$0.isAllDay }) ?? model.events.first {
+                    let upcoming = model.events.filter { $0.end > ctx.date }
+                    if let next = upcoming.first(where: { !$0.isAllDay }) ?? upcoming.first {
                         Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { model.tab = .calendar } } label: {
                             NextEventLine(event: next)
                         }
