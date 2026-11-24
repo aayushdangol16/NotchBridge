@@ -302,6 +302,32 @@ enum SelfTest {
         check("drag ends away from the notch -> closes", m.mode == .idle && !m.fileDragActive)
         m.tab = .home
 
+        // --- Media: music first ---
+        func np(_ app: String, _ title: String, playing: Bool, phone: Bool = false) -> NowPlaying {
+            NowPlaying(source: phone ? .phone : .mac, title: title, artist: "A", album: "", duration: 200, elapsed: 10,
+                       elapsedAt: Date(), rate: 1, isPlaying: playing, appName: app, appID: app, artwork: nil, artKey: nil)
+        }
+        let spotifyPaused = np("com.spotify.client", "Song", playing: false)
+        let bravePaused = np("com.brave.Browser", "Lesson 2A | AI Fluency", playing: false)
+        let bravePlaying = np("com.brave.Browser", "Some video", playing: true)
+        typealias MC = MediaCenter
+        check("Spotify paused + browser video paused -> shows Spotify (your last music)",
+              MC.choose(mac: bravePaused, phone: nil, memory: spotifyPaused, nonMusicSince: nil)?.title == "Song")
+        check("browser starts playing -> still Spotify for the first moment (no blips)",
+              MC.choose(mac: bravePlaying, phone: nil, memory: spotifyPaused, nonMusicSince: Date())?.title == "Song")
+        check("browser keeps playing -> shows the video",
+              MC.choose(mac: bravePlaying, phone: nil, memory: spotifyPaused, nonMusicSince: Date().addingTimeInterval(-3))?.title == "Some video")
+        check("Spotify playing beats a playing browser",
+              MC.choose(mac: bravePlaying, phone: nil, memory: np("com.spotify.client", "Song", playing: true),
+                        nonMusicSince: Date().addingTimeInterval(-10))?.title == "Song")
+        check("phone music playing beats a paused browser",
+              MC.choose(mac: bravePaused, phone: np("com.spotify.music", "Phone song", playing: true, phone: true),
+                        memory: spotifyPaused, nonMusicSince: nil)?.title == "Phone song")
+        check("no music ever -> the paused browser item",
+              MC.choose(mac: bravePaused, phone: nil, memory: nil, nonMusicSince: nil)?.title == "Lesson 2A | AI Fluency")
+        check("Spotify is music, Brave is not",
+              MusicApps.isMusic(spotifyPaused) && !MusicApps.isMusic(bravePaused))
+
         // --- New event form ---
         let cal = Calendar.current
         let morning = cal.date(bySettingHour: 10, minute: 10, second: 0, of: Date())!

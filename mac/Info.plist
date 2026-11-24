@@ -32,6 +32,8 @@
     <string>NotchBridge shows your upcoming events in the notch and reminds you a few minutes before meetings.</string>
     <key>NSCameraUsageDescription</key>
     <string>The Mirror tab shows your camera so you can check how you look before a call. It is only used while that tab is open.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>NotchBridge controls Spotify and Music (play, pause, skip, seek) from the notch when a browser tab is holding Now Playing.</string>
     <key>NSBonjourServices</key>
     <array>
         <string>_notchbridge._tcp</string>
