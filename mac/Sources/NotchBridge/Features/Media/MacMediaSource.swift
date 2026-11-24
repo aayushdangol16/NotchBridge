@@ -67,6 +67,18 @@ final class MacMediaSource {
         try? p.run()
     }
 
+    /// Jump to `seconds` in whatever is playing on the Mac.
+    func seek(to seconds: Double) {
+        guard let helper = Self.helperPath else { return }
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/usr/bin/perl")
+        p.arguments = ["-e", Self.loader, helper, "nb_seek"]
+        p.environment = ["NB_MEDIA_SEEK": String(format: "%.2f", max(0, seconds))]
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        try? p.run()
+    }
+
     private func helperExited() {
         process = nil
         // Restart unless it keeps dying (then MediaRemote access is probably blocked on this macOS).

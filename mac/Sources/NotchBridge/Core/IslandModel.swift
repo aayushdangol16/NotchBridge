@@ -113,6 +113,7 @@ final class IslandModel: ObservableObject {
     var onOpenNotification: (PhoneNotification) -> Void = { _ in }
     var onRing: (Bool) -> Void = { _ in }              // true = ring, false = stop
     var onMedia: (MediaCommand) -> Void = { _ in }
+    var onSeek: (Double) -> Void = { _ in }          // seconds
     var onClearAll: () -> Void = {}
     var onJoin: (URL) -> Void = { _ in }
     /// title, start, minutes (0 = all day)

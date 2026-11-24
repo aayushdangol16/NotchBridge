@@ -275,7 +275,7 @@ object Bridge {
                 send(JSONObject().put("type", "result").put("ok", true).put("msg", "Ringing your phone"))
             }
             "ring_stop" -> PhoneFinder.stop(app)
-            "media_cmd" -> MediaWatcher.command(json.optString("cmd"))
+            "media_cmd" -> MediaWatcher.command(json.optString("cmd"), json.optDouble("pos", -1.0))
             "file_begin" -> FileReceiver.begin(app, json)?.let(::send)
             "file_chunk" -> FileReceiver.chunk(app, json)?.let(::send)
             "file_end" -> send(FileReceiver.end(app, json))

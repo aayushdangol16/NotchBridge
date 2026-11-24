@@ -14,6 +14,7 @@ final class MediaCenter: ObservableObject {
 
     /// Sends a command to the phone (set by AppDelegate).
     var sendToPhone: (MediaCommand) -> Void = { _ in }
+    var seekOnPhone: (Double) -> Void = { _ in }
 
     func start() {
         mac.onUpdate = { [weak self] np in
@@ -55,6 +56,21 @@ final class MediaCenter: ObservableObject {
     func phoneDisconnected() {
         phoneNow = nil
         recompute()
+    }
+
+    /// Jump to `seconds`. Updates the shown position right away so the bar doesn't snap back
+    /// while the player catches up.
+    func seek(to seconds: Double) {
+        guard var c = current else { return }
+        let target = max(0, min(seconds, c.duration ?? seconds))
+        switch c.source {
+        case .mac: mac.seek(to: target)
+        case .phone: seekOnPhone(target)
+        }
+        c.elapsed = target
+        c.elapsedAt = Date()
+        current = c
+        if c.source == .mac { macNow = c } else { phoneNow = c }
     }
 
     func send(_ cmd: MediaCommand) {

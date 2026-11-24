@@ -283,6 +283,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let m = island.model
         m.liveMusicEnabled = Prefs.liveMusic
         m.onMedia = { [weak self] cmd in self?.media.send(cmd) }
+        m.onSeek = { [weak self] seconds in self?.media.seek(to: seconds) }
+        media.seekOnPhone = { [weak self] seconds in
+            self?.server.send(MacCommand(type: "media_cmd", cmd: "seek", pos: seconds))
+        }
         media.sendToPhone = { [weak self] cmd in
             self?.server.send(MacCommand(type: "media_cmd", cmd: cmd.rawValue))
         }

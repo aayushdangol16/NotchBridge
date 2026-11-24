@@ -5,6 +5,7 @@
 //
 //   /usr/bin/perl -e '<loader>' libNowPlayingHelper.dylib nb_stream     # JSON line per change on stdout
 //   NB_MEDIA_CMD=<n> /usr/bin/perl -e '<loader>' libNowPlayingHelper.dylib nb_send
+//   NB_MEDIA_SEEK=<seconds> /usr/bin/perl -e '<loader>' libNowPlayingHelper.dylib nb_seek
 //
 // where <loader> uses DynaLoader to load this library and call the symbol as an XSUB.
 // (Same technique as github.com/ungive/mediaremote-adapter; this is an independent, minimal version.)
@@ -135,6 +136,20 @@ void nb_stream(void *interp, void *cv) {
         CFRunLoopRun();
     }
     exit(0);
+}
+
+/// XSUB entry: jump to a position (seconds in $NB_MEDIA_SEEK) and exit.
+typedef void (*MRSetElapsedFn)(double);
+void nb_seek(void *interp, void *cv) {
+    @autoreleasepool {
+        loadMediaRemote();
+        MRSetElapsedFn setElapsed = (MRSetElapsedFn)dlsym(mr, "MRMediaRemoteSetElapsedTime");
+        const char *v = getenv("NB_MEDIA_SEEK");
+        if (!setElapsed || !v) exit(1);
+        setElapsed(atof(v));
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.2, false);
+        exit(0);
+    }
 }
 
 /// XSUB entry: send one MRMediaRemoteSendCommand (number in $NB_MEDIA_CMD) and exit.

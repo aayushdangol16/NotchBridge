@@ -54,7 +54,8 @@ struct MacCommand: Encodable {
     var i: Int? = nil
     var text: String? = nil
     var name: String? = nil
-    var cmd: String? = nil      // media_cmd: toggle | next | prev
+    var cmd: String? = nil      // media_cmd: toggle | next | prev | seek
+    var pos: Double? = nil      // media_cmd seek: seconds
     // file_begin / file_chunk / file_end
     var id: String? = nil
     var size: Int64? = nil

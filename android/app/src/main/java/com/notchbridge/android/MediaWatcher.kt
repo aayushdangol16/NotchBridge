@@ -77,13 +77,17 @@ object MediaWatcher {
         c?.registerCallback(callback, main)
     }
 
-    fun command(cmd: String) = main.post {
+    fun command(cmd: String, pos: Double = -1.0) = main.post {
         val c = controller ?: return@post
         val t = c.transportControls
         when (cmd) {
             "toggle" -> if (c.playbackState?.state == PlaybackState.STATE_PLAYING) t.pause() else t.play()
             "next" -> t.skipToNext()
             "prev" -> t.skipToPrevious()
+            "seek" -> if (pos >= 0) {
+                t.seekTo((pos * 1000).toLong())
+                lastSignature = ""      // report the new position promptly
+            }
         }
     }
 

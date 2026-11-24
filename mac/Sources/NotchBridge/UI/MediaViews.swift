@@ -107,28 +107,8 @@ struct NowPlayingCard: View {
         )
     }
 
-    @ViewBuilder private var progress: some View {
-        if let duration = media.duration, duration > 1 {
-            TimelineView(.periodic(from: .now, by: 1)) { ctx in
-                let pos = media.position(at: ctx.date)
-                VStack(spacing: 2) {
-                    GeometryReader { g in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(.white.opacity(0.12))
-                            Capsule().fill(accent).frame(width: g.size.width * min(1, pos / duration))
-                        }
-                    }
-                    .frame(height: 3)
-                    HStack {
-                        Text(Self.time(pos))
-                        Spacer()
-                        Text("-" + Self.time(max(0, duration - pos)))
-                    }
-                    .font(.system(size: 8.5, weight: .medium, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.white.opacity(0.4))
-                }
-            }
-        }
+    private var progress: some View {
+        SeekBar(media: media, accent: accent) { model.onSeek($0) }
     }
 
     static func time(_ s: Double) -> String {
@@ -154,5 +134,62 @@ struct MediaButton: View {
         }
         .buttonStyle(.plain)
         .onHover { h in withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) { hover = h } }
+    }
+}
+
+/// Progress bar you can click or drag to jump around the track. Thickens with a knob on hover;
+/// the time labels follow the finger while scrubbing.
+struct SeekBar: View {
+    let media: NowPlaying
+    let accent: Color
+    let onSeek: (Double) -> Void
+    @State private var scrub: Double?        // 0…1 while dragging
+    @State private var hover = false
+
+    var body: some View {
+        if let duration = media.duration, duration > 1 {
+            TimelineView(.periodic(from: .now, by: 0.5)) { ctx in
+                let live = media.position(at: ctx.date) / duration
+                let fraction = min(1, max(0, scrub ?? live))
+                let active = hover || scrub != nil
+                VStack(spacing: 2) {
+                    GeometryReader { g in
+                        let w = max(g.size.width, 1)
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(.white.opacity(0.12)).frame(height: active ? 6 : 3)
+                            Capsule().fill(accent).frame(width: w * fraction, height: active ? 6 : 3)
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 11, height: 11)
+                                .shadow(color: .black.opacity(0.4), radius: 2)
+                                .offset(x: w * fraction - 5.5)
+                                .opacity(active ? 1 : 0)
+                        }
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { v in scrub = min(1, max(0, v.location.x / w)) }
+                                .onEnded { v in
+                                    let f = min(1, max(0, v.location.x / w))
+                                    onSeek(f * duration)
+                                    scrub = nil
+                                }
+                        )
+                    }
+                    .frame(height: 14)
+                    HStack {
+                        Text(NowPlayingCard.time(fraction * duration))
+                        Spacer()
+                        Text("-" + NowPlayingCard.time(max(0, duration - fraction * duration)))
+                    }
+                    .font(.system(size: 8.5, weight: scrub != nil ? .bold : .medium, design: .rounded).monospacedDigit())
+                    .foregroundStyle(.white.opacity(scrub != nil ? 0.8 : 0.4))
+                }
+                .animation(.easeOut(duration: 0.15), value: active)
+            }
+            .onHover { hover = $0 }
+            .help("Click or drag to jump")
+        }
     }
 }
