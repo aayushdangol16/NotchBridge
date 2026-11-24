@@ -117,6 +117,9 @@ New protocol messages, all inside the existing AES-GCM frames:
 
 ## 5. Phases
 
+Status: phases 0–6 are built (see the README and git history).
+
+
 | Phase | Delivers | Done when |
 |---|---|---|
 | **0. Reliability** (done in this update) | Phone-side alert decisions, queue for missed notifications, faster reconnect, newest-wins with a "+N" badge, call forwarding | Bursts no longer replay old chats. Notifications sent while the Mac was asleep appear after it wakes. |

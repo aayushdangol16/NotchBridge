@@ -193,6 +193,15 @@ enum SelfTest {
         check("drag ends away from the notch -> closes", m.mode == .idle && !m.fileDragActive)
         m.tab = .home
 
+        // --- Phase 6: volume strip ---
+        c.showSystem(.volume(level: 40, muted: false)); spin(0.3)
+        check("volume change -> strip", m.mode == .activity && m.system == .volume(level: 40, muted: false))
+        c.showSystem(.volume(level: 50, muted: false)); spin(0.1)
+        check("holding the volume key updates the same strip", m.system == .volume(level: 50, muted: false) && m.mode == .activity)
+        spin(1.6 + 0.8)
+        check("volume strip hides itself", m.mode == .idle && m.system == nil)
+        check("five dashboard tabs", IslandModel.Tab.allCases.count == 5)
+
         print(failures.n == 0 ? "ALL PASSED" : "\(failures.n) FAILED")
         return failures.n == 0 ? 0 : 1
     }

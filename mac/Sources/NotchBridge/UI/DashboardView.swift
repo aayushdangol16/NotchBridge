@@ -13,6 +13,7 @@ struct DashboardView: View {
             case .phone: phone
             case .calendar: CalendarTab(model: model)
             case .shelf: ShelfTab(model: model)
+            case .mirror: MirrorTab(model: model)
             }
         }
         .frame(height: Self.contentHeight, alignment: .top)

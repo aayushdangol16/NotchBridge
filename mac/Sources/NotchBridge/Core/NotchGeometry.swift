@@ -9,9 +9,13 @@ struct NotchGeometry: Equatable {
     static let fallback = NotchGeometry(screenFrame: CGRect(x: 0, y: 0, width: 1440, height: 900),
                                         notchSize: CGSize(width: 185, height: 32), hasNotch: false)
 
-    /// Prefers the built-in display with a notch; otherwise the main screen (island hangs from the menu bar).
+    /// "auto": the display with a notch if there is one, else the primary display (menu bar).
+    /// "primary": always the primary display, e.g. an external monitor you work on with the lid open.
     static func current() -> NotchGeometry {
-        let screen = NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main ?? NSScreen.screens.first
+        let primary = NSScreen.screens.first
+        let screen = Prefs.display == "primary"
+            ? primary
+            : (NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? primary)
         guard let screen else { return .fallback }
         let frame = screen.frame
         if screen.safeAreaInsets.top > 0,

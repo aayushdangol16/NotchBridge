@@ -94,6 +94,7 @@ enum Snapshot {
                 m.shelfItems = paths.map { ShelfItem(id: UUID(), path: $0, addedAt: Date()) }
                 m.transfers = [m.shelfItems[1].id: 0.62]
             }),
+            ("21-volume", model(.activity) { $0.notification = nil; $0.system = .volume(level: 62, muted: false); $0.stage = .compact }),
             ("10-idle-live-music", model(.idle) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),
             ("11-peek-music", model(.peek) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),
             ("12-home-music", model(.open) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),

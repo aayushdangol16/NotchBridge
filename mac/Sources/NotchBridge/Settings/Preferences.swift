@@ -12,6 +12,9 @@ enum Prefs {
         static let calendar = "calendar"
         static let meetingReminders = "meetingReminders"
         static let batteryAlerts = "batteryAlerts"
+        static let volumeHUD = "volumeHUD"
+        static let display = "display"              // "auto" | "primary"
+        static let loginItemAutoSetup = "loginItemAutoSetup"
     }
 
     static func registerDefaults() {
@@ -25,6 +28,8 @@ enum Prefs {
             Key.calendar: true,
             Key.meetingReminders: true,
             Key.batteryAlerts: true,
+            Key.volumeHUD: false,
+            Key.display: "auto",
         ])
     }
 
@@ -37,4 +42,6 @@ enum Prefs {
     static var calendar: Bool { d.bool(forKey: Key.calendar) }
     static var meetingReminders: Bool { d.bool(forKey: Key.meetingReminders) }
     static var batteryAlerts: Bool { d.bool(forKey: Key.batteryAlerts) }
+    static var volumeHUD: Bool { d.bool(forKey: Key.volumeHUD) }
+    static var display: String { d.string(forKey: Key.display) ?? "auto" }
 }

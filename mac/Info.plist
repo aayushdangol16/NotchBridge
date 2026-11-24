@@ -10,6 +10,8 @@
     <string>com.notchbridge.mac</string>
     <key>CFBundleExecutable</key>
     <string>NotchBridge</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -28,6 +30,8 @@
     <string>NotchBridge shows your upcoming events in the notch and reminds you a few minutes before meetings.</string>
     <key>NSCalendarsUsageDescription</key>
     <string>NotchBridge shows your upcoming events in the notch and reminds you a few minutes before meetings.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>The Mirror tab shows your camera so you can check how you look before a call. It is only used while that tab is open.</string>
     <key>NSBonjourServices</key>
     <array>
         <string>_notchbridge._tcp</string>

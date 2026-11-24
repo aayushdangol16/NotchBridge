@@ -14,7 +14,7 @@ struct SystemCompactBar: View {
                 Image(systemName: leftIcon)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(accent)
-                    .scaleEffect(pulse ? 1.15 : 0.9)
+                    .scaleEffect(pulses ? (pulse ? 1.15 : 0.9) : 1)
                     .animation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true), value: pulse)
                 Text(leftText)
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
@@ -30,11 +30,19 @@ struct SystemCompactBar: View {
         .onAppear { pulse = true }
     }
 
+    private var pulses: Bool {
+        if case .volume = activity { return false }
+        return true
+    }
+
     private var leftIcon: String {
         switch activity {
         case .charging(_, let charging): return charging ? "bolt.fill" : "powerplug.fill"
         case .lowBattery: return "exclamationmark.triangle.fill"
         case .meeting: return "calendar"
+        case .volume(let level, let muted):
+            if muted || level == 0 { return "speaker.slash.fill" }
+            return level < 34 ? "speaker.wave.1.fill" : (level < 67 ? "speaker.wave.2.fill" : "speaker.wave.3.fill")
         }
     }
 
@@ -43,6 +51,7 @@ struct SystemCompactBar: View {
         case .charging(_, let charging): return charging ? "Charging" : "Plugged in"
         case .lowBattery: return "Low battery"
         case .meeting: return "Meeting"
+        case .volume(_, let muted): return muted ? "Muted" : "Volume"
         }
     }
 
@@ -52,11 +61,28 @@ struct SystemCompactBar: View {
             BatteryFill(level: level, color: accent)
         case .lowBattery(let level):
             BatteryFill(level: level, color: accent)
+        case .volume(let level, let muted):
+            LevelBar(level: muted ? 0 : level, color: accent)
         case .meeting(let e):
             Text(minutesUntil(e.start))
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(accent)
         }
+    }
+}
+
+/// Horizontal level bar (volume), animating smoothly between values.
+struct LevelBar: View {
+    let level: Int
+    let color: Color
+
+    var body: some View {
+        ZStack(alignment: .leading) {
+            Capsule().fill(.white.opacity(0.15))
+            Capsule().fill(color).frame(width: 54 * CGFloat(min(max(level, 0), 100)) / 100)
+        }
+        .frame(width: 54, height: 5)
+        .animation(.spring(response: 0.25, dampingFraction: 0.85), value: level)
     }
 }
 

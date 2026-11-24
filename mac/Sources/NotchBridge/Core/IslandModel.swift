@@ -9,7 +9,7 @@ final class IslandModel: ObservableObject {
     /// Activities grow in two steps: a compact peek beside the camera, then the full card.
     enum Stage: Equatable { case compact, full }
     enum Tab: String, CaseIterable, Identifiable {
-        case home, phone, calendar, shelf
+        case home, phone, calendar, shelf, mirror
         var id: String { rawValue }
         var icon: String {
             switch self {
@@ -17,6 +17,7 @@ final class IslandModel: ObservableObject {
             case .phone: return "iphone.gen3"
             case .calendar: return "calendar"
             case .shelf: return "tray.full.fill"
+            case .mirror: return "camera.fill"
             }
         }
         var title: String {
@@ -25,6 +26,7 @@ final class IslandModel: ObservableObject {
             case .phone: return "Phone"
             case .calendar: return "Agenda"
             case .shelf: return "Shelf"
+            case .mirror: return "Mirror"
             }
         }
     }

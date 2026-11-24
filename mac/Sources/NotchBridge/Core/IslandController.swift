@@ -356,6 +356,12 @@ final class IslandController {
 
     /// Show a Mac-side activity (charging, low battery, upcoming meeting).
     func showSystem(_ a: SystemActivity) {
+        // Repeats of what's on screen (volume key held down…) update it in place.
+        if model.mode == .activity, let current = model.system, current.sameKind(as: a) {
+            model.system = a
+            if !pointerInside { scheduleHide(after: a.duration) }
+            return
+        }
         if model.mode == .activity, model.notification != nil {
             // Busy with a phone card: meetings wait, battery blips are dropped.
             if a.hasCard { pendingSystem = a }
@@ -448,6 +454,12 @@ final class IslandController {
     private func haptic() {
         guard Prefs.haptics else { return }
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+    }
+
+    /// Re-read which display to use (Settings › Show the island on).
+    func refreshGeometry() {
+        reposition()
+        islandSize = .zero
     }
 
     private func reposition() {

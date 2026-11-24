@@ -19,8 +19,12 @@ Foreground service (keep-alive)┘  WebSocket,     └── optional Notificati
 
 ### Mac
 ```bash
+cd mac && ./make-signing-cert.sh   # optional, one time
 cd mac && ./build-app.sh --install
 ```
+- `make-signing-cert.sh` creates a self-signed "NotchBridge Local Signing" certificate in your login keychain. With it, macOS keeps Calendar, Camera and Local Network permission across rebuilds.
+- Without it, the app is ad-hoc signed and macOS may ask for those permissions again after each rebuild.
+- The first launch from /Applications adds NotchBridge to your login items. You can turn that off in Settings.
 This builds an ad-hoc signed app and copies it to `/Applications`. Without `--install`, the app is left in `mac/build/NotchBridge.app`.
 
 ### Android
@@ -80,6 +84,9 @@ The notch is now a small dynamic island:
   - Double-click a file to open it.
   - Hover a file for **AirDrop** or **Send to phone**. Sending shows a progress ring; on the phone the file lands in **Downloads › NotchBridge** with a notification you can tap to open it.
   - Use **AirDrop all** or **Clear** for everything. Removing a file from the shelf never deletes the file itself.
+- **Mirror:** the camera tab shows your camera, so you can check how you look before a call. The camera only runs while that tab is open.
+- **Volume** (off by default, Settings): a small volume bar beside the camera when you change the volume. macOS's own volume indicator still shows too.
+- **Multiple displays:** in Settings, choose whether the island appears on the display with the notch or on your primary display.
 - **Priorities:** phone notifications beat everything else. A meeting card that gets interrupted comes back afterwards. Battery strips never cover a phone card or the open dashboard.
 - **New phone notifications** peek out of the notch, then open into a card that stays for about 6 seconds (adjustable in Settings). Hovering keeps it open.
   - Click the card for **Reply**, the app's own action, and **Clear** (which also removes it from the phone).

@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let calendar = CalendarService()
     private let battery = BatteryMonitor()
     private let shelf = ShelfStore()
+    private let volume = VolumeMonitor()
     private var transferItems: [String: UUID] = [:]   // transfer id -> shelf item
     private var cancellables = Set<AnyCancellable>()
     private let pairingWindow = PairingWindowController()
@@ -33,6 +34,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         wireMedia()
         wireCalendarAndBattery()
         wireShelf()
+        wireVolume()
+        setUpLoginItemOnce()
 
         if Pairing.shared.pairedDevice == nil {
             pairingWindow.show()
@@ -292,6 +295,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { [weak m] c in m?.mediaAccent = c }
             .store(in: &cancellables)
         media.start()
+    }
+
+    private func wireVolume() {
+        volume.onChange = { [weak self] level, muted in self?.island.showSystem(.volume(level: level, muted: muted)) }
+        if Prefs.volumeHUD { volume.start() }
+        settingsWindow.model.onVolumeHUDChanged = { [weak self] on in
+            if on { self?.volume.start() } else { self?.volume.stop() }
+        }
+        settingsWindow.model.onDisplayChanged = { [weak self] in self?.island.refreshGeometry() }
+    }
+
+    /// Daily driver: the first time it runs from /Applications, start it at login (can be turned off in Settings).
+    private func setUpLoginItemOnce() {
+        let d = UserDefaults.standard
+        guard Bundle.main.bundlePath.hasPrefix("/Applications/"), !d.bool(forKey: Prefs.Key.loginItemAutoSetup) else { return }
+        d.set(true, forKey: Prefs.Key.loginItemAutoSetup)
+        do {
+            try SMAppService.mainApp.register()
+            DebugLog.write("login item: registered")
+        } catch {
+            DebugLog.write("login item: \(error.localizedDescription)")
+        }
     }
 
     private func wireShelf() {

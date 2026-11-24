@@ -26,6 +26,16 @@ enum SystemActivity: Equatable {
     case charging(level: Int, charging: Bool)
     case lowBattery(level: Int)
     case meeting(CalEvent)
+    case volume(level: Int, muted: Bool)
+
+    /// Same kind of activity (a new volume level updates the strip instead of re-animating it).
+    func sameKind(as other: SystemActivity) -> Bool {
+        switch (self, other) {
+        case (.charging, .charging), (.lowBattery, .lowBattery), (.volume, .volume): return true
+        case (.meeting(let a), .meeting(let b)): return a.id == b.id
+        default: return false
+        }
+    }
 
     /// Meetings open into a full card; battery events stay a compact strip beside the camera.
     var hasCard: Bool {
@@ -38,6 +48,7 @@ enum SystemActivity: Equatable {
         case .charging: return 3.5
         case .lowBattery: return 5
         case .meeting: return 15
+        case .volume: return 1.6
         }
     }
 
@@ -46,6 +57,7 @@ enum SystemActivity: Equatable {
         case .charging: return NSColor(srgbRed: 0.2, green: 0.85, blue: 0.4, alpha: 1)
         case .lowBattery: return NSColor(srgbRed: 1, green: 0.32, blue: 0.3, alpha: 1)
         case .meeting(let e): return e.color
+        case .volume: return NSColor(white: 0.95, alpha: 1)
         }
     }
 }

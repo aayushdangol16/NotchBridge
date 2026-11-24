@@ -9,6 +9,8 @@ final class SettingsModel: ObservableObject {
     var onMirrorChanged: (Bool) -> Void = { _ in }
     var onLiveMusicChanged: (Bool) -> Void = { _ in }
     var onCalendarChanged: (Bool) -> Void = { _ in }
+    var onDisplayChanged: () -> Void = {}
+    var onVolumeHUDChanged: (Bool) -> Void = { _ in }
     @Published var calendarStatus = ""
 }
 
@@ -23,6 +25,8 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.calendar) private var calendar = true
     @AppStorage(Prefs.Key.meetingReminders) private var meetingReminders = true
     @AppStorage(Prefs.Key.batteryAlerts) private var batteryAlerts = true
+    @AppStorage(Prefs.Key.volumeHUD) private var volumeHUD = false
+    @AppStorage(Prefs.Key.display) private var display = "auto"
     @State private var loginError: String?
 
     var body: some View {
@@ -33,6 +37,13 @@ struct SettingsView: View {
                 Toggle("Haptic tap on new notifications", isOn: $haptics)
                 Toggle("Show what's playing beside the camera", isOn: $liveMusic)
                     .onChange(of: liveMusic) { _, on in model.onLiveMusicChanged(on) }
+                Toggle("Show volume changes in the notch", isOn: $volumeHUD)
+                    .onChange(of: volumeHUD) { _, on in model.onVolumeHUDChanged(on) }
+                Picker("Show the island on", selection: $display) {
+                    Text("The display with the notch (automatic)").tag("auto")
+                    Text("The primary display (menu bar)").tag("primary")
+                }
+                .onChange(of: display) { _, _ in model.onDisplayChanged() }
                 LabeledContent("Gestures") {
                     Text("Click or swipe down to open · swipe up to close · swipe left/right to skip tracks")
                         .foregroundStyle(.secondary)
