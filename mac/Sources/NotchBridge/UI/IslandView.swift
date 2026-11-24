@@ -2,11 +2,6 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-private struct IslandSizeKey: PreferenceKey {
-    static var defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) { value = nextValue() }
-}
-
 /// Root of the island. One black shape that morphs between:
 ///   idle      notch-sized, invisible (the hardware notch shows through)
 ///   peek      a little wider: phone status left of the camera, notification count right
@@ -16,10 +11,8 @@ struct IslandView: View {
     @ObservedObject var model: IslandModel
     @Namespace private var ns
 
-    static let cardWidth: CGFloat = 350
-    static let dashboardWidth: CGFloat = 480
-    private let peekWing: CGFloat = 38
-    private let activityWing: CGFloat = 32
+    static let cardWidth: CGFloat = IslandLayout.openWidth
+    static let dashboardWidth: CGFloat = IslandLayout.openWidth
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -30,34 +23,9 @@ struct IslandView: View {
 
     // MARK: - Geometry per state
 
-    private var isCard: Bool {
-        model.mode == .activity && model.stage == .full && (model.notification != nil || model.system?.hasCard == true)
-    }
-
-    /// Battery strips carry words beside the camera, so they need wider wings.
-    private var systemWing: CGFloat {
-        guard let s = model.system, !s.hasCard else { return activityWing }
-        return 76
-    }
-
-    private var radii: (top: CGFloat, bottom: CGFloat) {
-        switch model.mode {
-        case .idle: return model.liveVisible ? (8, 14) : (6, 10)
-        case .peek: return (8, 13)
-        case .activity: return model.stage == .full ? (12, 24) : (8, 14)
-        case .open: return (14, 28)
-        }
-    }
-
-    private var width: CGFloat {
-        let notch = model.notchSize.width
-        switch model.mode {
-        case .idle: return notch + 2 * (model.liveVisible ? activityWing : 0) + 2 * radii.top
-        case .peek: return notch + 2 * peekWing + 2 * radii.top
-        case .activity: return model.stage == .full ? Self.cardWidth : notch + 2 * systemWing + 2 * radii.top
-        case .open: return Self.dashboardWidth
-        }
-    }
+    private var isCard: Bool { IslandLayout.isCard(model) }
+    private var radii: (top: CGFloat, bottom: CGFloat) { IslandLayout.radii(model) }
+    private var size: CGSize { IslandLayout.size(model) }
 
     private var accent: Color {
         if let n = model.notification { return Color(nsColor: model.accent(n.pkg)) }
@@ -97,7 +65,7 @@ struct IslandView: View {
             }
         }
         .padding(.horizontal, radii.top)
-        .frame(width: width, alignment: .top)
+        .frame(width: size.width, height: size.height, alignment: .top)
         // Pure black, one piece with the hardware notch: no tint, no outline, no hover growth.
         // (Colour lives only in small details: avatar ring, buttons, countdown.)
         .background(Color.black)
@@ -118,8 +86,6 @@ struct IslandView: View {
         .onTapGesture {
             if model.mode == .peek || model.mode == .idle { model.onOpenDashboard() }
         }
-        .background(GeometryReader { g in Color.clear.preference(key: IslandSizeKey.self, value: g.size) })
-        .onPreferenceChange(IslandSizeKey.self) { model.onIslandSize($0) }
     }
 
     // MARK: - Strip beside the camera

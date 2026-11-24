@@ -63,6 +63,20 @@ enum SelfTest {
 
         c.pointerMoved(notch); spin(0.6)
         check("open stays open while pointer inside", m.mode == .open)
+        print("  tracked island rect while open: \(c.islandRect.size)")
+        check("tracked island size = dashboard size (so its buttons count as inside)",
+              abs(c.islandRect.width - IslandView.dashboardWidth) < 1 && c.islandRect.height > 150)
+        let tabButton = CGPoint(x: c.islandRect.minX + 40, y: c.islandRect.maxY - 16)   // left of the camera
+        c.pointerMoved(tabButton); spin(0.8)
+        check("moving to the tab buttons keeps the dashboard open", m.mode == .open)
+        let lowerCorner = CGPoint(x: c.islandRect.maxX - 30, y: c.islandRect.minY + 20)
+        c.pointerMoved(lowerCorner); spin(0.8)
+        check("moving to the far corner of the dashboard keeps it open", m.mode == .open)
+        check("clicks over the dashboard go to its buttons (not the app behind)", c.capturesClicks)
+        c.pointerMoved(far); spin(0.1)
+        check("clicks outside the island fall through", !c.capturesClicks)
+        c.pointerMoved(lowerCorner); spin(0.2)
+        c.pointerMoved(notch); spin(0.2)
 
         c.swipe(down: false); spin(0.4)
         check("swipe up closes (pointer inside -> peek)", m.mode == .peek)

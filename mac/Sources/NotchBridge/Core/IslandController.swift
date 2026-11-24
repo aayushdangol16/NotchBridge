@@ -16,7 +16,6 @@ final class IslandController {
     private let panel = NotchPanel()
     private let hover = HoverTracker()
     private(set) var geometry = NotchGeometry.current()
-    private var islandSize: CGSize = .zero
     private var pointer = CGPoint(x: -10_000, y: -10_000)
     private(set) var pointerInside = false
     private var fileDragging = false
@@ -88,19 +87,16 @@ final class IslandController {
             }
         }
         model.onCloseDashboard = { [weak self] in self?.closeDashboard() }
-        model.onIslandSize = { [weak self] size in
-            guard let self, size != self.islandSize else { return }
-            self.islandSize = size
-            self.pointerMoved(self.pointer)   // the island changed shape under a still pointer
-        }
     }
 
     // MARK: - Pointer
 
-    /// Screen rect of the island as currently laid out.
+    /// Whether clicks at the pointer go to the island (true) or fall through to apps below (false).
+    var capturesClicks: Bool { !panel.ignoresMouseEvents }
+
+    /// Screen rect of the island as drawn (same numbers the view uses: IslandLayout).
     var islandRect: CGRect {
-        let size = islandSize == .zero ? geometry.notchSize : islandSize
-        return geometry.topCenterRect(size)
+        geometry.topCenterRect(IslandLayout.size(model))
     }
 
     /// Bigger target while dragging a file toward the notch.
@@ -258,6 +254,15 @@ final class IslandController {
     private func setMode(_ mode: IslandModel.Mode, _ animation: Animation) {
         withAnimation(animation) { model.mode = mode }
         updateMouseCapture()
+        recheckPointer()
+    }
+
+    /// The island changed shape under a pointer that isn't moving: re-evaluate inside/outside.
+    private func recheckPointer() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.pointerMoved(self.pointer, fileDrag: self.fileDragging)
+        }
     }
 
     // MARK: - Activities (phone notifications)
@@ -412,6 +417,7 @@ final class IslandController {
             model.expanded = false
         }
         updateMouseCapture()
+        recheckPointer()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
             guard let self, t == self.token else { return }
             self.model.notification = nil
@@ -465,7 +471,7 @@ final class IslandController {
     /// Re-read which display to use (Settings › Show the island on).
     func refreshGeometry() {
         reposition()
-        islandSize = .zero
+        recheckPointer()
     }
 
     private func reposition() {

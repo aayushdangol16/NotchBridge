@@ -116,6 +116,4 @@ final class IslandModel: ObservableObject {
     var onCalendarAccess: () -> Void = {}             // ask for access / open Privacy settings
     /// A text field in the dashboard wants focus: make the panel key and keep the dashboard open.
     var onNeedKeyboard: () -> Void = {}
-    /// The view reports the island's laid-out size so the controller can hit-test it on screen.
-    var onIslandSize: (CGSize) -> Void = { _ in }
 }
