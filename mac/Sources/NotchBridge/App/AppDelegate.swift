@@ -1,18 +1,23 @@
 import AppKit
+import Combine
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let server = BridgeServer()
     private let store = NotificationStore()
-    private let notch = NotchController()
+    private let island = IslandController()
+    private let settingsWindow = SettingsWindowController()
+    private var cancellables = Set<AnyCancellable>()
     private let pairingWindow = PairingWindowController()
     private let systemNotifier = SystemNotifier()
     private var statusItem: NSStatusItem!
     private var status: BridgeServer.Status = .starting
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Prefs.registerDefaults()
         setUpStatusItem()
-        wireNotch()
+        wireIsland()
+        wireSettings()
         wireStore()
         wireServer()
 
@@ -32,6 +37,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.status = s
             self.pairingWindow.model.status = s
             self.updateStatusIcon()
+            self.island.model.phoneConnected = { if case .connected = s { return true } else { return false } }()
+            self.island.model.phoneName = Pairing.shared.pairedDevice
+            self.settingsWindow.model.phoneStatus = self.statusText
             if case .connected = s, self.pairingWindow.isVisible {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.pairingWindow.close() }
             }
@@ -59,9 +67,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             store.replaceAll(m.list ?? [])
         case "result":
             if m.ok == true {
-                notch.flash(m.msg ?? "Done")
+                island.flash(m.msg ?? "Done")
             } else {
-                notch.flash(m.msg ?? "The phone couldn't do that", isError: true, hideAfter: 3)
+                island.flash(m.msg ?? "The phone couldn't do that", isError: true, hideAfter: 3)
             }
         default:
             break
@@ -70,17 +78,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func wireStore() {
         store.onAlert = { [weak self] n in
-            self?.notch.show(n)
+            self?.island.show(n)
             self?.systemNotifier.post(n)
         }
         store.onRemove = { [weak self] key in
-            self?.notch.remove(key: key)
+            self?.island.remove(key: key)
             self?.systemNotifier.remove(key: key)
         }
     }
 
-    private func wireNotch() {
-        let m = notch.model
+    private func wireIsland() {
+        let m = island.model
+        m.phoneName = Pairing.shared.pairedDevice
+        m.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
+        m.onPairPhone = { [weak self] in self?.pairingWindow.show() }
+        m.onReshow = { [weak self] n in self?.island.show(n) }
+        store.$items
+            .receive(on: DispatchQueue.main)
+            .sink { [weak m] items in m?.recent = items }
+            .store(in: &cancellables)
         m.appIcon = { [weak self] pkg in self?.store.icon(for: pkg) }
         m.accent = { [weak self] pkg in self?.store.accent(for: pkg) ?? AccentColor.fallback }
         m.onDismiss = { [weak self] n in
@@ -89,16 +105,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         m.onAction = { [weak self] n, a in
             self?.server.send(MacCommand(type: "action", key: n.key, i: a.i))
-            self?.notch.flash("Sent “\(a.title)” to phone")
+            self?.island.flash("Sent “\(a.title)” to phone")
         }
         m.onReply = { [weak self] n, a, text in
             guard let self else { return }
             guard case .connected = self.status else {
-                self.notch.flash("Phone is not connected", isError: true, hideAfter: 3)
+                self.island.flash("Phone is not connected", isError: true, hideAfter: 3)
                 return
             }
             self.server.send(MacCommand(type: "reply", key: n.key, i: a.i, text: text))
-            self.notch.flash("Sending…", hideAfter: 5)
+            self.island.flash("Sending…", hideAfter: 5)
         }
     }
 
@@ -169,7 +185,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         menu.addItem(item("Show a test notification", #selector(showTest)))
         menu.addItem(.separator())
+        menu.addItem(item("Open dashboard", #selector(openDashboard)))
         menu.addItem(item("Pair phone…", #selector(showPairing)))
+        let settings = item("Settings…", #selector(showSettings))
+        settings.keyEquivalent = ","
+        menu.addItem(settings)
 
         let mirror = item("Also show in Notification Center", #selector(toggleMirror))
         mirror.state = systemNotifier.enabled ? .on : .off
@@ -192,18 +212,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func reshow(_ sender: NSMenuItem) {
         guard let key = sender.representedObject as? String,
               let n = store.items.first(where: { $0.key == key }) else { return }
-        notch.show(n)
+        island.show(n)
     }
 
     @objc private func showTest() {
-        notch.show(PhoneNotification(
+        island.show(PhoneNotification(
             key: "test-\(UUID().uuidString)", pkg: "test", app: "NotchBridge",
             title: "Hello from your phone 👋",
-            text: "This is how Android notifications will look in the notch. Hover to keep it open, click to see actions.",
+            text: "This is how Android notifications will look in the island. Hover to keep it open, click to see actions.",
             sub: nil, time: Date(), actions: [], largeIcon: nil))
     }
 
     @objc private func showPairing() { pairingWindow.show() }
+
+    @objc private func showSettings() { settingsWindow.show() }
+
+    @objc private func openDashboard() { island.openDashboard() }
+
+    private func wireSettings() {
+        settingsWindow.model.phoneStatus = statusText
+        settingsWindow.model.onPair = { [weak self] in self?.pairingWindow.show() }
+        settingsWindow.model.onMirrorChanged = { [weak self] on in
+            if on { self?.systemNotifier.requestAuthorization() }
+        }
+    }
 
     @objc private func toggleMirror() { systemNotifier.enabled.toggle() }
 

@@ -6,6 +6,11 @@ if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLi
     exit(0)
 }
 
+if CommandLine.arguments.contains("--selftest") {
+    _ = NSApplication.shared
+    exit(SelfTest.run())
+}
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

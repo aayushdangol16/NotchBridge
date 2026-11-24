@@ -52,9 +52,26 @@ On the phone (NotchBridge app):
 Both devices must be on the same Wi-Fi. A VPN or "client isolation" (common on guest and office Wi-Fi) blocks the connection.
 
 ## Using it
-- A notification grows out of the notch and stays for about 6 seconds. Hovering keeps it open.
-- Click it to show **Reply**, the app's own action buttons, and **Dismiss**. Dismiss also removes it from the phone.
-- The menu bar has **Recent notifications**, a test notification, **Also show in Notification Center** (keeps a history) and **Launch at login**.
+The notch is now a small dynamic island:
+- **Hover over the notch:** it widens slightly. The phone link status shows on the left of the camera and the number of phone notifications on the right.
+- **Click it, or swipe down on the trackpad:** opens the dashboard.
+  - **Home:** the clock and date, phone status, and the latest notifications.
+  - **Phone:** all current phone notifications. Click one to show it again.
+  - Move the pointer away, click outside, or swipe up to close it.
+- **New phone notifications** peek out of the notch, then open into a card that stays for about 6 seconds (adjustable in Settings). Hovering keeps it open.
+  - Click the card for **Reply**, the app's own action, and **Clear** (which also removes it from the phone).
+  - Swipe up to hide the card.
+  - If several notifications arrive at once, the card shows the newest one with a "+N" badge.
+- **Settings (⌘, from the menu bar or the gear icon in the dashboard):**
+  - hover behaviour and haptics
+  - how long cards stay
+  - Notification Center copy
+  - pairing
+  - launch at login
+
+Developer checks:
+- `NotchBridge --selftest` runs the state-machine tests.
+- `NotchBridge --snapshot <dir>` renders every island state to PNG.
 
 ## How it works
 
@@ -63,9 +80,10 @@ Both devices must be on the same Wi-Fi. A VPN or "client isolation" (common on g
 | Reads notifications, runs reply/dismiss | `android/…/NotificationCaptureService.kt` |
 | Finds the Mac (last IP, then Bonjour), connects, retries | `android/…/Bridge.kt` |
 | Keeps the process alive on Samsung | `android/…/BridgeService.kt` (foreground service, type `connectedDevice`) |
-| WebSocket server and Bonjour `_notchbridge._tcp` on port 47821 | `mac/…/BridgeServer.swift` |
-| Notch panel and animation | `mac/…/NotchController.swift`, `NotchView.swift` |
-| Key and QR code | `mac/…/Pairing.swift`, `PairingWindow.swift` |
+| WebSocket server and Bonjour `_notchbridge._tcp` on port 47821 | `mac/…/Features/Phone/BridgeServer.swift` |
+| Island state machine, hover and gestures | `mac/…/Core/IslandController.swift`, `HoverTracker.swift` |
+| Island views (peek, card, dashboard) | `mac/…/UI/IslandView.swift`, `NotificationCard.swift`, `DashboardView.swift` |
+| Key and QR code | `mac/…/Features/Phone/Pairing.swift`, `PairingWindow.swift` |
 
 **Protocol.** Every WebSocket frame is binary data: `nonce(12) | ciphertext | tag(16)`, encrypted with AES-256-GCM using the 32-byte key from the QR code. The decrypted content is JSON with a `type` field:
 

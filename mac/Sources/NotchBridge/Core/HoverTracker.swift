@@ -1,0 +1,53 @@
+import AppKit
+
+/// Watches the pointer without needing Accessibility permission: a 20 Hz position poll (plus local
+/// move events over our own panel), clicks anywhere (to close the dashboard), and scroll gestures.
+final class HoverTracker {
+    var onMove: (CGPoint) -> Void = { _ in }
+    var onMouseDownOutside: (CGPoint) -> Void = { _ in }
+    var onScroll: (NSEvent) -> Void = { _ in }
+
+    private var monitors: [Any] = []
+    private var poll: Timer?
+    private var lastPoint = CGPoint(x: -1, y: -1)
+
+    func start() {
+        // Pointer position is polled (cheap: one read, 20×/s) rather than taken from a global
+        // mouse-moved monitor, which makes the window server copy every mouse event into our
+        // process and cost a few % CPU whenever the mouse moves. Local events (pointer over our
+        // own panel) still update instantly.
+        let move: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
+        if let m = NSEvent.addLocalMonitorForEvents(matching: move, handler: { [weak self] e in self?.tick(); return e }) {
+            monitors.append(m)
+        }
+        // Clicks in other apps = clicks outside the island.
+        if let m = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
+            self?.onMouseDownOutside(NSEvent.mouseLocation)
+        }) {
+            monitors.append(m)
+        }
+        // Scrolls are delivered to our panel when the pointer is over it.
+        if let m = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] e in
+            self?.onScroll(e)
+            return e
+        }) {
+            monitors.append(m)
+        }
+        let t = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in self?.tick() }
+        t.tolerance = 0.015
+        RunLoop.main.add(t, forMode: .common)
+        poll = t
+    }
+
+    private func tick() {
+        let p = NSEvent.mouseLocation
+        guard p != lastPoint else { return }
+        lastPoint = p
+        onMove(p)
+    }
+
+    deinit {
+        monitors.forEach(NSEvent.removeMonitor)
+        poll?.invalidate()
+    }
+}

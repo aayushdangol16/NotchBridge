@@ -28,27 +28,34 @@ enum Snapshot {
             text: "Mom: Dinner is ready, come home soon!", sub: nil, time: Date().addingTimeInterval(-180),
             actions: [WireAction(i: 0, title: "Reply", reply: true)], largeIcon: nil)
 
-        func model(_ n: PhoneNotification, _ phase: NotchModel.Phase, configure: (NotchModel) -> Void = { _ in }) -> NotchModel {
-            let m = NotchModel()
+        func model(_ mode: IslandModel.Mode, _ n: PhoneNotification? = msg, configure: (IslandModel) -> Void = { _ in }) -> IslandModel {
+            let m = IslandModel()
             m.notchSize = CGSize(width: 185, height: 32)
             m.hasNotch = true
-            m.current = n
-            m.phase = phase
+            m.mode = mode
+            m.stage = .full
+            m.notification = mode == .activity ? n : nil
             m.appIcon = { icons[$0] }
             m.accent = { pkg in icons[pkg].flatMap(AccentColor.from) ?? AccentColor.fallback }
             m.hideDuration = 6
             m.hideDeadline = Date().addingTimeInterval(3.6)
+            m.phoneName = "Aayush's M36"
+            m.phoneConnected = true
+            m.recent = [msg, wa]
             configure(m)
             return m
         }
 
-        let shots: [(String, NotchModel)] = [
-            ("1-compact", model(msg, .compact)),
-            ("2-open", model(msg, .open)),
-            ("3-open-whatsapp-queued", model(wa, .open) { $0.queued = 2 }),
-            ("4-actions", model(msg, .open) { $0.expanded = true; $0.hideDeadline = nil }),
-            ("5-reply", model(msg, .open) { $0.expanded = true; $0.replying = true; $0.replyText = "Yes! See you there"; $0.hideDeadline = nil }),
-            ("6-sent", model(msg, .open) { $0.feedback = "Reply sent" }),
+        let shots: [(String, IslandModel)] = [
+            ("01-peek", model(.peek)),
+            ("02-open-home", model(.open)),
+            ("03-open-phone", model(.open) { $0.tab = .phone }),
+            ("04-open-offline", model(.open) { $0.phoneConnected = false; $0.recent = [] }),
+            ("05-activity-compact", model(.activity) { $0.stage = .compact }),
+            ("06-activity-card", model(.activity)),
+            ("07-card-whatsapp-queued", model(.activity, wa) { $0.queued = 2 }),
+            ("08-card-actions", model(.activity) { $0.expanded = true; $0.hovering = true; $0.hideDeadline = nil }),
+            ("09-card-sent", model(.activity) { $0.feedback = "Reply sent" }),
         ]
 
         for (name, m) in shots {
@@ -56,9 +63,9 @@ enum Snapshot {
                 LinearGradient(colors: [Color(red: 0.16, green: 0.24, blue: 0.42), Color(red: 0.55, green: 0.42, blue: 0.62)],
                                startPoint: .topLeading, endPoint: .bottomTrailing)
                 Rectangle().fill(.white.opacity(0.18)).frame(height: 32)   // menu bar
-                NotchView(model: m)
+                IslandView(model: m)
             }
-            .frame(width: NotchController.panelSize.width, height: NotchController.panelSize.height)
+            .frame(width: IslandController.panelSize.width, height: IslandController.panelSize.height)
             .environment(\.colorScheme, .dark)
 
             let renderer = ImageRenderer(content: view)
