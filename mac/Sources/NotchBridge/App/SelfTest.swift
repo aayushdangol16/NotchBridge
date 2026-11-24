@@ -86,6 +86,16 @@ enum SelfTest {
         m.onCloseActivity(); spin(0.6)
         check("closing it returns to the dashboard", m.mode == .open)
 
+        c.toast("Reply sent"); spin(0.2)
+        check("toast in the dashboard", m.toast == "Reply sent")
+        spin(2.4)
+        check("toast clears itself", m.toast == nil)
+
+        m.rowReplyKey = "x"
+        c.pointerMoved(far); spin(0.8)
+        check("dashboard stays open while typing a reply", m.mode == .open)
+        m.rowReplyKey = nil
+        c.pointerMoved(notch); spin(0.1)
         c.pointerMoved(far); spin(0.8)
         check("back to idle", m.mode == .idle)
 

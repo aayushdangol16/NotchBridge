@@ -1,6 +1,10 @@
 package com.notchbridge.android
 
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -80,12 +84,19 @@ object Bridge {
     private class Pending(val sbn: StatusBarNotification, val silent: Boolean, val alert: Boolean, val at: Long)
     private val outbox = LinkedHashMap<String, Pending>()
 
+    private var batteryLevel = -1
+    private var batteryCharging = false
+
     fun init(context: Context) {
         if (initialized) return
         initialized = true
         app = context.applicationContext
         if (PairingStore.load(app) != null) status = Status(State.SEARCHING, PairingStore.load(app)?.macName)
         watchNetwork()
+        watchBattery()
+        PhoneFinder.onRingingChanged = { on ->
+            handler.post { if (status.state == State.CONNECTED) send(JSONObject().put("type", "ringing").put("on", on)) }
+        }
     }
 
     // ---- public API (any thread) ----
@@ -250,7 +261,14 @@ object Bridge {
                 // Missed notifications first (they may pop), then the full list (which never pops).
                 flushOutbox()
                 sendSync()
+                sendBattery()
+                if (PhoneFinder.isRinging) send(JSONObject().put("type", "ringing").put("on", true))
             }
+            "ring" -> {
+                PhoneFinder.ring(app)
+                send(JSONObject().put("type", "result").put("ok", true).put("msg", "Ringing your phone"))
+            }
+            "ring_stop" -> PhoneFinder.stop(app)
             "dismiss", "action", "reply" -> {
                 val result = listenerService?.perform(json)
                     ?: if (json.optString("type") == "dismiss") null
@@ -376,6 +394,42 @@ object Bridge {
         discovery?.let { runCatching { nsd.stopServiceDiscovery(it) } }
         discovery = null
         resolving = false
+    }
+
+    // ---- battery ----
+
+    private fun watchBattery() {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) = onBattery(intent)
+        }
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        val sticky = if (Build.VERSION.SDK_INT >= 33) {
+            app.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            app.registerReceiver(receiver, filter)
+        }
+        sticky?.let(::onBattery)
+    }
+
+    private fun onBattery(i: Intent) {
+        val level = i.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = i.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+        if (level < 0 || scale <= 0) return
+        val pct = level * 100 / scale
+        val st = i.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val charging = st == BatteryManager.BATTERY_STATUS_CHARGING || st == BatteryManager.BATTERY_STATUS_FULL
+        handler.post {
+            // ACTION_BATTERY_CHANGED also fires for temperature/voltage; only report real changes.
+            if (pct == batteryLevel && charging == batteryCharging) return@post
+            batteryLevel = pct
+            batteryCharging = charging
+            sendBattery()
+        }
+    }
+
+    private fun sendBattery() {
+        if (status.state != State.CONNECTED || batteryLevel < 0) return
+        send(JSONObject().put("type", "battery").put("level", batteryLevel).put("charging", batteryCharging))
     }
 
     // ---- misc ----

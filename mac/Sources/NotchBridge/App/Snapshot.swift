@@ -41,6 +41,7 @@ enum Snapshot {
             m.hideDeadline = Date().addingTimeInterval(3.6)
             m.phoneName = "Aayush's M36"
             m.phoneConnected = true
+            m.phoneBattery = 82
             m.recent = [msg, wa]
             configure(m)
             return m
@@ -50,6 +51,8 @@ enum Snapshot {
             ("01-peek", model(.peek)),
             ("02-open-home", model(.open)),
             ("03-open-phone", model(.open) { $0.tab = .phone }),
+            ("03b-phone-expanded", model(.open) { $0.tab = .phone; $0.openRowKey = msg.key; $0.phoneCharging = true }),
+            ("03c-phone-ringing-toast", model(.open) { $0.tab = .phone; $0.phoneRinging = true; $0.phoneBattery = 14; $0.toast = "Ringing your phone" }),
             ("04-open-offline", model(.open) { $0.phoneConnected = false; $0.recent = [] }),
             ("05-activity-compact", model(.activity) { $0.stage = .compact }),
             ("06-activity-card", model(.activity)),

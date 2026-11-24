@@ -17,7 +17,7 @@ struct IslandView: View {
 
     static let cardWidth: CGFloat = 350
     static let dashboardWidth: CGFloat = 480
-    private let peekWing: CGFloat = 24
+    private let peekWing: CGFloat = 38
     private let activityWing: CGFloat = 32
 
     var body: some View {
@@ -134,11 +134,17 @@ struct IslandView: View {
     /// Hover peek: phone link status on the left, notification count (or a hint) on the right.
     private var peekBar: some View {
         HStack(spacing: 0) {
-            Image(systemName: model.phoneConnected ? "iphone.gen3.radiowaves.left.and.right" : "iphone.gen3.slash")
-                .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(model.phoneConnected ? Color.green : Color.white.opacity(0.4))
-                .padding(.leading, 9)
-                .transition(.opacity)
+            Group {
+                if model.phoneConnected, let level = model.phoneBattery {
+                    BatteryView(level: level, charging: model.phoneCharging)
+                } else {
+                    Image(systemName: model.phoneConnected ? "iphone.gen3.radiowaves.left.and.right" : "iphone.gen3.slash")
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(model.phoneConnected ? Color.green : Color.white.opacity(0.4))
+                }
+            }
+            .padding(.leading, 9)
+            .transition(.opacity)
             Spacer()
             Group {
                 if model.recent.isEmpty {

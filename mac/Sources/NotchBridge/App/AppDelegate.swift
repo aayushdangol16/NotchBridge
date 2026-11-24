@@ -39,6 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.updateStatusIcon()
             self.island.model.phoneConnected = { if case .connected = s { return true } else { return false } }()
             self.island.model.phoneName = Pairing.shared.pairedDevice
+            if case .connected = s {} else { self.island.model.phoneRinging = false }
             self.settingsWindow.model.phoneStatus = self.statusText
             if case .connected = s, self.pairingWindow.isVisible {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.pairingWindow.close() }
@@ -67,10 +68,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             store.replaceAll(m.list ?? [])
         case "result":
             if m.ok == true {
-                island.flash(m.msg ?? "Done")
+                island.toast(m.msg ?? "Done")
             } else {
-                island.flash(m.msg ?? "The phone couldn't do that", isError: true, hideAfter: 3)
+                island.toast(m.msg ?? "The phone couldn't do that", isError: true)
             }
+        case "battery":
+            island.model.phoneBattery = m.level
+            island.model.phoneCharging = m.charging ?? false
+        case "ringing":
+            island.model.phoneRinging = m.on ?? false
         default:
             break
         }
@@ -93,6 +99,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.onOpenSettings = { [weak self] in self?.settingsWindow.show() }
         m.onPairPhone = { [weak self] in self?.pairingWindow.show() }
         m.onReshow = { [weak self] n in self?.island.show(n) }
+        m.onRing = { [weak self] on in
+            guard let self else { return }
+            guard case .connected = self.status else {
+                self.island.toast("Phone is not connected", isError: true)
+                return
+            }
+            self.server.send(MacCommand(type: on ? "ring" : "ring_stop"))
+            self.island.model.phoneRinging = on
+        }
+        m.onClearAll = { [weak self] in
+            guard let self else { return }
+            for n in self.store.items {
+                self.server.send(MacCommand(type: "dismiss", key: n.key))
+                self.store.remove(key: n.key)
+            }
+        }
         store.$items
             .receive(on: DispatchQueue.main)
             .sink { [weak m] items in m?.recent = items }
@@ -105,16 +127,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         m.onAction = { [weak self] n, a in
             self?.server.send(MacCommand(type: "action", key: n.key, i: a.i))
-            self?.island.flash("Sent “\(a.title)” to phone")
+            self?.island.toast("Sent “\(a.title)” to phone")
         }
         m.onReply = { [weak self] n, a, text in
             guard let self else { return }
             guard case .connected = self.status else {
-                self.island.flash("Phone is not connected", isError: true, hideAfter: 3)
+                self.island.toast("Phone is not connected", isError: true)
                 return
             }
             self.server.send(MacCommand(type: "reply", key: n.key, i: a.i, text: text))
-            self.island.flash("Sending…", hideAfter: 5)
+            self.island.toast("Sending…")
         }
     }
 

@@ -38,7 +38,18 @@ final class IslandModel: ObservableObject {
     // Phone status for peek + dashboard
     @Published var phoneName: String?
     @Published var phoneConnected = false
+    @Published var phoneBattery: Int?
+    @Published var phoneCharging = false
+    @Published var phoneRinging = false
     @Published var recent: [PhoneNotification] = []
+
+    // Phone tab interaction
+    @Published var openRowKey: String?       // row showing full text + actions
+    @Published var rowReplyKey: String?      // row with an inline reply field
+    @Published var rowReplyText = ""
+    /// Short status line in the dashboard ("Reply sent", "Ringing your phone").
+    @Published var toast: String?
+    @Published var toastIsError = false
 
     // Data + actions provided by the app
     var appIcon: (String) -> NSImage? = { _ in nil }
@@ -53,6 +64,10 @@ final class IslandModel: ObservableObject {
     var onOpenSettings: () -> Void = {}
     var onPairPhone: () -> Void = {}
     var onReshow: (PhoneNotification) -> Void = { _ in }
+    var onRing: (Bool) -> Void = { _ in }              // true = ring, false = stop
+    var onClearAll: () -> Void = {}
+    /// A text field in the dashboard wants focus: make the panel key and keep the dashboard open.
+    var onNeedKeyboard: () -> Void = {}
     /// The view reports the island's laid-out size so the controller can hit-test it on screen.
     var onIslandSize: (CGSize) -> Void = { _ in }
 }

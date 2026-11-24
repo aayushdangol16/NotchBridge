@@ -56,7 +56,11 @@ The notch is now a small dynamic island:
 - **Hover over the notch:** it widens slightly. The phone link status shows on the left of the camera and the number of phone notifications on the right.
 - **Click it, or swipe down on the trackpad:** opens the dashboard.
   - **Home:** the clock and date, phone status, and the latest notifications.
-  - **Phone:** all current phone notifications. Click one to show it again.
+  - **Phone:** all current phone notifications, plus the phone's battery level.
+    - Click a row to see its full text.
+    - Hover a row for quick **Reply** (typed right there), the app's own action, and **Clear**.
+    - **Find phone** rings the phone at full alarm volume for 30 seconds, even on silent. Stop it from the Mac or from the phone's notification.
+    - **Clear all** dismisses everything on the phone too.
   - Move the pointer away, click outside, or swipe up to close it.
 - **New phone notifications** peek out of the notch, then open into a card that stays for about 6 seconds (adjustable in Settings). Hovering keeps it open.
   - Click the card for **Reply**, the app's own action, and **Clear** (which also removes it from the phone).

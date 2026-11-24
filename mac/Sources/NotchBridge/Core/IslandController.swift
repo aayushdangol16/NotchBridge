@@ -25,6 +25,7 @@ final class IslandController {
     private var hideWork: DispatchWorkItem?
     private var token = 0                            // invalidates stale animation callbacks
     private var returnToOpen = false
+    private var toastToken = 0
 
     // Dashboard
     private var closeWork: DispatchWorkItem?
@@ -65,6 +66,11 @@ final class IslandController {
         model.onExpandCard = { [weak self] in
             guard let self else { return }
             self.cancelHide()
+            self.panel.makeKey()
+        }
+        model.onNeedKeyboard = { [weak self] in
+            guard let self else { return }
+            self.closeWork?.cancel()
             self.panel.makeKey()
         }
         model.onOpenDashboard = { [weak self] in self?.openDashboard() }
@@ -123,7 +129,8 @@ final class IslandController {
             setMode(.idle, .spring(response: 0.3, dampingFraction: 0.85))
         case .open:
             let work = DispatchWorkItem { [weak self] in
-                guard let self, !self.pointerInside else { return }
+                // Don't yank the dashboard away from someone typing a reply in it.
+                guard let self, !self.pointerInside, self.model.rowReplyKey == nil else { return }
                 self.closeDashboard()
             }
             closeWork = work
@@ -189,6 +196,9 @@ final class IslandController {
     func closeDashboard() {
         closeWork?.cancel()
         guard model.mode == .open else { return }
+        model.rowReplyKey = nil
+        model.rowReplyText = ""
+        model.openRowKey = nil
         setMode(pointerInside ? .peek : .idle, .spring(response: 0.38, dampingFraction: 0.86))
     }
 
@@ -239,6 +249,24 @@ final class IslandController {
             model.feedbackIsError = isError
         }
         scheduleHide(after: hideAfter)
+    }
+
+    /// Feedback from the phone ("Reply sent"): in the card if one is showing, else in the dashboard.
+    func toast(_ message: String, isError: Bool = false) {
+        if model.mode == .activity {
+            flash(message, isError: isError, hideAfter: isError ? 3 : 1.4)
+            return
+        }
+        toastToken += 1
+        let t = toastToken
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            model.toast = message
+            model.toastIsError = isError
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + (isError ? 3.5 : 2.2)) { [weak self] in
+            guard let self, t == self.toastToken else { return }
+            withAnimation(.easeOut(duration: 0.25)) { self.model.toast = nil }
+        }
     }
 
     private func present(_ n: PhoneNotification) {
