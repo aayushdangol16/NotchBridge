@@ -141,10 +141,12 @@ struct ChromeButton: View {
         Button(action: action) {
             HStack(spacing: 4) {
                 Image(systemName: icon).font(.system(size: 10, weight: .semibold))
-                if let title { Text(title).font(.system(size: 10.5, weight: .semibold, design: .rounded)) }
+                if let title {
+                    Text(title).font(.system(size: 10.5, weight: .semibold, design: .rounded)).lineLimit(1).fixedSize()
+                }
             }
             .foregroundStyle(.white.opacity(selected ? 1 : (hover ? 0.85 : 0.5)))
-            .padding(.horizontal, title == nil ? 6 : 8)
+            .padding(.horizontal, title == nil ? 5 : 8)
             .padding(.vertical, 4)
             .background(Capsule().fill(.white.opacity(selected ? 0.16 : (hover ? 0.08 : 0))))
         }

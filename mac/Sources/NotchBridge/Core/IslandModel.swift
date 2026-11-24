@@ -9,10 +9,22 @@ final class IslandModel: ObservableObject {
     /// Activities grow in two steps: a compact peek beside the camera, then the full card.
     enum Stage: Equatable { case compact, full }
     enum Tab: String, CaseIterable, Identifiable {
-        case home, phone
+        case home, phone, calendar
         var id: String { rawValue }
-        var icon: String { self == .home ? "house.fill" : "iphone.gen3" }
-        var title: String { self == .home ? "Home" : "Phone" }
+        var icon: String {
+            switch self {
+            case .home: return "house.fill"
+            case .phone: return "iphone.gen3"
+            case .calendar: return "calendar"
+            }
+        }
+        var title: String {
+            switch self {
+            case .home: return "Home"
+            case .phone: return "Phone"
+            case .calendar: return "Agenda"
+            }
+        }
     }
 
     @Published var mode: Mode = .idle
@@ -20,8 +32,9 @@ final class IslandModel: ObservableObject {
     @Published var tab: Tab = .home
     @Published var hovering = false
 
-    // Current activity (a phone notification) and its interaction state
+    // Current activity: a phone notification, or a system activity (charging, meeting…)
     @Published var notification: PhoneNotification?
+    @Published var system: SystemActivity?
     @Published var expanded = false
     @Published var replying = false
     @Published var replyText = ""
@@ -50,6 +63,11 @@ final class IslandModel: ObservableObject {
     /// While idle and music plays, the island shows a small live strip (art + bars) beside the camera.
     var liveVisible: Bool { mode == .idle && liveMusicEnabled && (media?.isPlaying ?? false) }
 
+    // Calendar
+    enum CalendarAccess { case off, unknown, granted, denied }
+    @Published var events: [CalEvent] = []
+    @Published var calendarAccess: CalendarAccess = .off
+
     // Phone tab interaction
     @Published var openRowKey: String?       // row showing full text + actions
     @Published var rowReplyKey: String?      // row with an inline reply field
@@ -74,6 +92,8 @@ final class IslandModel: ObservableObject {
     var onRing: (Bool) -> Void = { _ in }              // true = ring, false = stop
     var onMedia: (MediaCommand) -> Void = { _ in }
     var onClearAll: () -> Void = {}
+    var onJoin: (URL) -> Void = { _ in }
+    var onCalendarAccess: () -> Void = {}             // ask for access / open Privacy settings
     /// A text field in the dashboard wants focus: make the panel key and keep the dashboard open.
     var onNeedKeyboard: () -> Void = {}
     /// The view reports the island's laid-out size so the controller can hit-test it on screen.

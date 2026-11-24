@@ -23,12 +23,13 @@ enum SelfTest {
         let m = c.model
         let far = CGPoint(x: c.geometry.screenFrame.minX + 20, y: c.geometry.screenFrame.minY + 20)
         let notch = CGPoint(x: c.geometry.hotZone.midX, y: c.geometry.hotZone.midY)
-        var failures = 0
+        final class Counter { var n = 0 }
+        let failures = Counter()
 
         func spin(_ s: TimeInterval) { RunLoop.main.run(until: Date().addingTimeInterval(s)) }
         func check(_ name: String, _ ok: Bool) {
             print("\(ok ? "PASS" : "FAIL")  \(name)  (mode=\(m.mode) stage=\(m.stage) queued=\(m.queued))")
-            if !ok { failures += 1 }
+            if !ok { failures.n += 1 }
         }
         func note(_ key: String, _ title: String) -> PhoneNotification {
             PhoneNotification(key: key, pkg: "com.test", app: "Test", title: title, text: "hello",
@@ -117,7 +118,53 @@ enum SelfTest {
         check("paused -> live strip hides", !m.liveVisible && m.mode == .idle)
         m.media = nil
 
-        print(failures == 0 ? "ALL PASSED" : "\(failures) FAILED")
-        return failures == 0 ? 0 : 1
+        // --- Phase 4: battery rules, join links, system activities ---
+        typealias B = BatteryMonitor.State
+        check("plugging in -> charging activity",
+              BatteryMonitor.transitions(from: B(level: 50, charging: false, pluggedIn: false),
+                                         to: B(level: 50, charging: true, pluggedIn: true)) == [.charging(level: 50, charging: true)])
+        check("dropping to 20% on battery -> low battery",
+              BatteryMonitor.transitions(from: B(level: 21, charging: false, pluggedIn: false),
+                                         to: B(level: 20, charging: false, pluggedIn: false)) == [.lowBattery(level: 20)])
+        check("19% after 20% -> no repeat",
+              BatteryMonitor.transitions(from: B(level: 20, charging: false, pluggedIn: false),
+                                         to: B(level: 19, charging: false, pluggedIn: false)).isEmpty)
+        check("10% -> second warning",
+              BatteryMonitor.transitions(from: B(level: 11, charging: false, pluggedIn: false),
+                                         to: B(level: 10, charging: false, pluggedIn: false)) == [.lowBattery(level: 10)])
+        check("zoom link found in notes",
+              CalendarService.joinLink(in: [nil, "Room 4", "Join: https://us02web.zoom.us/j/123456789?pwd=abc."])
+                == URL(string: "https://us02web.zoom.us/j/123456789?pwd=abc"))
+        check("meet link found in location",
+              CalendarService.joinLink(in: ["https://meet.google.com/abc-defg-hij"]) == URL(string: "https://meet.google.com/abc-defg-hij"))
+        check("teams link found",
+              CalendarService.joinLink(in: ["Click https://teams.microsoft.com/l/meetup-join/19%3ameeting_x%40thread.v2/0 to join"]) != nil)
+        check("ordinary link ignored", CalendarService.joinLink(in: ["https://example.com/agenda"]) == nil)
+
+        c.pointerMoved(far); spin(0.3)
+        c.showSystem(.charging(level: 80, charging: true)); spin(0.3)
+        check("charging -> compact strip", m.mode == .activity && m.system != nil && m.stage == .compact)
+        spin(3.5 + 0.7)
+        check("charging strip hides itself", m.mode == .idle && m.system == nil)
+
+        let ev = CalEvent(id: "e1", title: "Standup", start: Date().addingTimeInterval(240),
+                          end: Date().addingTimeInterval(1800), isAllDay: false, color: .systemPurple,
+                          location: nil, calendarTitle: "Work", joinURL: URL(string: "https://meet.google.com/abc-defg-hij"))
+        c.showSystem(.meeting(ev)); spin(0.9)
+        check("meeting reminder -> full card", m.mode == .activity && m.stage == .full && m.system == .meeting(ev))
+        c.show(note("p", "Phone beats meeting")); spin(0.2)
+        check("phone notification takes over the meeting", m.notification?.key == "p" && m.system == nil)
+        m.onCloseActivity(); spin(0.7)
+        check("meeting card comes back afterwards", m.system == .meeting(ev))
+        m.onCloseActivity(); spin(0.7)
+        check("then idle", m.mode == .idle && m.system == nil)
+        c.show(note("q", "Busy")); spin(0.2)
+        c.showSystem(.charging(level: 50, charging: true)); spin(0.2)
+        check("battery strip dropped while a phone card shows", m.notification?.key == "q" && m.system == nil)
+        m.onCloseActivity(); spin(0.7)
+        check("nothing left over", m.mode == .idle && m.system == nil && m.notification == nil)
+
+        print(failures.n == 0 ? "ALL PASSED" : "\(failures.n) FAILED")
+        return failures.n == 0 ? 0 : 1
     }
 }

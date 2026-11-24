@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let island = IslandController()
     private let settingsWindow = SettingsWindowController()
     private let media = MediaCenter()
+    private let calendar = CalendarService()
+    private let battery = BatteryMonitor()
     private var cancellables = Set<AnyCancellable>()
     private let pairingWindow = PairingWindowController()
     private let systemNotifier = SystemNotifier()
@@ -26,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if systemNotifier.enabled { systemNotifier.requestAuthorization() }
         server.start()
         wireMedia()
+        wireCalendarAndBattery()
 
         if Pairing.shared.pairedDevice == nil {
             pairingWindow.show()
@@ -277,7 +280,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         media.start()
     }
 
+    private func wireCalendarAndBattery() {
+        let m = island.model
+        m.onJoin = { url in NSWorkspace.shared.open(url) }
+        m.onCalendarAccess = { [weak self] in self?.calendarAccessAction() }
+        calendar.onEvents = { [weak m] events in m?.events = events }
+        calendar.onAccess = { [weak self] access in
+            self?.island.model.calendarAccess = access
+            self?.settingsWindow.model.calendarStatus = Self.describe(access)
+        }
+        calendar.onMeetingSoon = { [weak self] e in
+            guard Prefs.meetingReminders else { return }
+            self?.island.showSystem(.meeting(e))
+        }
+        if Prefs.calendar { calendar.start() }
+
+        battery.onActivity = { [weak self] a in
+            guard Prefs.batteryAlerts else { return }
+            self?.island.showSystem(a)
+        }
+        battery.start()
+    }
+
+    private func calendarAccessAction() {
+        switch island.model.calendarAccess {
+        case .off:
+            UserDefaults.standard.set(true, forKey: Prefs.Key.calendar)
+            calendar.start()
+        case .denied:
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+                NSWorkspace.shared.open(url)
+            }
+        default:
+            break
+        }
+    }
+
+    private static func describe(_ a: IslandModel.CalendarAccess) -> String {
+        switch a {
+        case .off: return ""
+        case .unknown: return "Waiting for you to allow calendar access…"
+        case .granted: return "Calendar access allowed."
+        case .denied: return "Calendar access is off. Allow it in System Settings › Privacy & Security › Calendars."
+        }
+    }
+
     private func wireSettings() {
+        settingsWindow.model.onCalendarChanged = { [weak self] on in
+            if on { self?.calendar.start() } else { self?.calendar.stop() }
+        }
         settingsWindow.model.onLiveMusicChanged = { [weak self] on in
             withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { self?.island.model.liveMusicEnabled = on }
         }

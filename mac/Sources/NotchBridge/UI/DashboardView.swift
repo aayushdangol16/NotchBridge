@@ -11,6 +11,7 @@ struct DashboardView: View {
             switch model.tab {
             case .home: home
             case .phone: phone
+            case .calendar: CalendarTab(model: model)
             }
         }
         .frame(height: Self.contentHeight, alignment: .top)
@@ -69,6 +70,14 @@ struct DashboardView: View {
                     Text(ctx.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))
                         .font(.system(size: 11.5, weight: .medium, design: .rounded))
                         .foregroundStyle(.white.opacity(0.5))
+                    if let next = model.events.first(where: { !$0.isAllDay }) ?? model.events.first {
+                        Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { model.tab = .calendar } } label: {
+                            NextEventLine(event: next)
+                        }
+                        .buttonStyle(.plain)
+                        .padding(.top, 10)
+                        .help("Open the Calendar tab")
+                    }
                 }
             }
             .frame(width: 150, alignment: .leading)

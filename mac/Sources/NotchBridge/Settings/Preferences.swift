@@ -9,6 +9,9 @@ enum Prefs {
         static let displaySeconds = "displaySeconds"
         static let mirrorToNotificationCenter = "mirrorToNotificationCenter"
         static let liveMusic = "liveMusic"
+        static let calendar = "calendar"
+        static let meetingReminders = "meetingReminders"
+        static let batteryAlerts = "batteryAlerts"
     }
 
     static func registerDefaults() {
@@ -19,6 +22,9 @@ enum Prefs {
             Key.displaySeconds: 6.0,
             Key.mirrorToNotificationCenter: false,
             Key.liveMusic: true,
+            Key.calendar: true,
+            Key.meetingReminders: true,
+            Key.batteryAlerts: true,
         ])
     }
 
@@ -28,4 +34,7 @@ enum Prefs {
     static var haptics: Bool { d.bool(forKey: Key.haptics) }
     static var displaySeconds: TimeInterval { max(2, d.double(forKey: Key.displaySeconds)) }
     static var liveMusic: Bool { d.bool(forKey: Key.liveMusic) }
+    static var calendar: Bool { d.bool(forKey: Key.calendar) }
+    static var meetingReminders: Bool { d.bool(forKey: Key.meetingReminders) }
+    static var batteryAlerts: Bool { d.bool(forKey: Key.batteryAlerts) }
 }

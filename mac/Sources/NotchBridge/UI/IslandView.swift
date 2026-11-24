@@ -29,7 +29,15 @@ struct IslandView: View {
 
     // MARK: - Geometry per state
 
-    private var isCard: Bool { model.mode == .activity && model.stage == .full && model.notification != nil }
+    private var isCard: Bool {
+        model.mode == .activity && model.stage == .full && (model.notification != nil || model.system?.hasCard == true)
+    }
+
+    /// Battery strips carry words beside the camera, so they need wider wings.
+    private var systemWing: CGFloat {
+        guard let s = model.system, !s.hasCard else { return activityWing }
+        return 76
+    }
 
     private var radii: (top: CGFloat, bottom: CGFloat) {
         switch model.mode {
@@ -45,13 +53,15 @@ struct IslandView: View {
         switch model.mode {
         case .idle: return notch + 2 * (model.liveVisible ? activityWing : 0) + 2 * radii.top
         case .peek: return notch + 2 * peekWing + 2 * radii.top
-        case .activity: return model.stage == .full ? Self.cardWidth : notch + 2 * activityWing + 2 * radii.top
+        case .activity: return model.stage == .full ? Self.cardWidth : notch + 2 * systemWing + 2 * radii.top
         case .open: return Self.dashboardWidth
         }
     }
 
     private var accent: Color {
-        model.notification.map { Color(nsColor: model.accent($0.pkg)) } ?? Color(nsColor: AccentColor.fallback)
+        if let n = model.notification { return Color(nsColor: model.accent(n.pkg)) }
+        if let s = model.system { return Color(nsColor: s.accent) }
+        return Color(nsColor: AccentColor.fallback)
     }
 
     // MARK: - Island
@@ -63,6 +73,13 @@ struct IslandView: View {
         return VStack(spacing: 0) {
             topBar
                 .frame(height: model.notchSize.height)
+            if isCard, model.notification == nil, case .meeting(let e) = model.system {
+                MeetingCard(model: model, event: e)
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top))
+                            .animation(.spring(response: 0.45, dampingFraction: 0.8).delay(0.06)),
+                        removal: .opacity.animation(.easeOut(duration: 0.12))))
+            }
             if isCard, let n = model.notification {
                 NotificationCard(model: model, n: n, accent: accent, ns: ns)
                     .transition(.asymmetric(
@@ -121,6 +138,8 @@ struct IslandView: View {
             case .activity:
                 if let n = model.notification {
                     if model.stage == .compact { compactActivityBar(n) } else { cardHeaderBar(n) }
+                } else if let s = model.system {
+                    if case .meeting(let e) = s, model.stage == .full { meetingHeaderBar(e) } else { SystemCompactBar(activity: s) }
                 } else {
                     Spacer()
                 }
@@ -246,6 +265,28 @@ struct IslandView: View {
         }
     }
 
+    private func meetingHeaderBar(_ e: CalEvent) -> some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 5) {
+                Image(systemName: "calendar").font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color(nsColor: e.color))
+                Text("Next")
+                    .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .padding(.leading, 12)
+            .frame(width: side(Self.cardWidth), alignment: .leading)
+            Spacer(minLength: 0)
+            Text(minutesUntil(e.start))
+                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                .foregroundStyle(Color(nsColor: e.color))
+                .padding(.trailing, 14)
+                .frame(width: side(Self.cardWidth), alignment: .trailing)
+        }
+    }
+
     /// Dashboard strip: tabs on the left of the camera, phone dot + settings on the right.
     private var dashboardBar: some View {
         HStack(spacing: 0) {
@@ -256,7 +297,7 @@ struct IslandView: View {
                     }
                 }
             }
-            .padding(.leading, 12)
+            .padding(.leading, 9)
             .frame(width: side(Self.dashboardWidth), alignment: .leading)
             Spacer(minLength: 0)
             HStack(spacing: 4) {

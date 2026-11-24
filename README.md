@@ -68,6 +68,14 @@ The notch is now a small dynamic island:
   - Swipe left or right over the notch to skip tracks.
   - The Home tab shows a full player with progress and controls. Music playing on the Mac takes priority over the phone.
   - Turn it off in Settings: "Show what's playing beside the camera".
+- **Calendar:** NotchBridge reads every account in the Calendar app (iCloud, Google, Exchange…). It asks for access the first time.
+  - The **Agenda** tab lists today's and tomorrow's events. A **Join** button appears from 15 minutes before a Zoom, Meet, Teams, Webex or FaceTime call.
+  - The Home clock shows your next event.
+  - 5 minutes before a meeting, a card drops out of the notch with **Join**.
+- **Mac battery:**
+  - Plugging in shows a green "Charging" strip beside the camera with the battery filling up.
+  - On battery, you get a red warning at 20% and again at 10%.
+- **Priorities:** phone notifications beat everything else. A meeting card that gets interrupted comes back afterwards. Battery strips never cover a phone card or the open dashboard.
 - **New phone notifications** peek out of the notch, then open into a card that stays for about 6 seconds (adjustable in Settings). Hovering keeps it open.
   - Click the card for **Reply**, the app's own action, and **Clear** (which also removes it from the phone).
   - Swipe up to hide the card.

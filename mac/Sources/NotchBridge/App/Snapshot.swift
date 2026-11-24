@@ -37,6 +37,17 @@ enum Snapshot {
             text: "Mom: Dinner is ready, come home soon!", sub: nil, time: Date().addingTimeInterval(-180),
             actions: [WireAction(i: 0, title: "Reply", reply: true)], largeIcon: nil)
 
+        let now = Date()
+        let events = [
+            CalEvent(id: "a", title: "Design review", start: now.addingTimeInterval(300), end: now.addingTimeInterval(2100),
+                     isAllDay: false, color: .systemPurple, location: "Zoom", calendarTitle: "Work",
+                     joinURL: URL(string: "https://zoom.us/j/1")),
+            CalEvent(id: "b", title: "Lunch with Sita", start: now.addingTimeInterval(7200), end: now.addingTimeInterval(10800),
+                     isAllDay: false, color: .systemOrange, location: "Café", calendarTitle: "Personal", joinURL: nil),
+            CalEvent(id: "c", title: "Sprint planning", start: now.addingTimeInterval(90000), end: now.addingTimeInterval(93600),
+                     isAllDay: false, color: .systemBlue, location: nil, calendarTitle: "Work", joinURL: nil),
+        ]
+
         func model(_ mode: IslandModel.Mode, _ n: PhoneNotification? = msg, configure: (IslandModel) -> Void = { _ in }) -> IslandModel {
             let m = IslandModel()
             m.notchSize = CGSize(width: 185, height: 32)
@@ -52,6 +63,8 @@ enum Snapshot {
             m.phoneConnected = true
             m.phoneBattery = 82
             m.recent = [msg, wa]
+            m.calendarAccess = .granted
+            m.events = events
             configure(m)
             return m
         }
@@ -68,6 +81,11 @@ enum Snapshot {
             ("07-card-whatsapp-queued", model(.activity, wa) { $0.queued = 2 }),
             ("08-card-actions", model(.activity) { $0.expanded = true; $0.hovering = true; $0.hideDeadline = nil }),
             ("09-card-sent", model(.activity) { $0.feedback = "Reply sent" }),
+            ("14-charging", model(.activity) { $0.notification = nil; $0.system = .charging(level: 64, charging: true); $0.stage = .compact }),
+            ("15-low-battery", model(.activity) { $0.notification = nil; $0.system = .lowBattery(level: 10); $0.stage = .compact }),
+            ("16-meeting-card", model(.activity) { $0.notification = nil; $0.system = .meeting(events[0]) }),
+            ("17-calendar-tab", model(.open) { $0.tab = .calendar }),
+            ("18-home-next-event", model(.open)),
             ("10-idle-live-music", model(.idle) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),
             ("11-peek-music", model(.peek) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),
             ("12-home-music", model(.open) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),

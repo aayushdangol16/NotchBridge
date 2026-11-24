@@ -26,6 +26,7 @@ final class IslandController {
     private var token = 0                            // invalidates stale animation callbacks
     private var returnToOpen = false
     private var toastToken = 0
+    private var pendingSystem: SystemActivity?       // a meeting waiting for a phone card to finish
 
     // Dashboard
     private var closeWork: DispatchWorkItem?
@@ -232,6 +233,14 @@ final class IslandController {
     // MARK: - Activities (phone notifications)
 
     func show(_ n: PhoneNotification) {
+        // Phone notifications outrank system activities: take over, but keep a meeting for afterwards.
+        if model.mode == .activity, let sys = model.system {
+            if sys.hasCard { pendingSystem = sys }
+            model.system = nil
+            model.queued = 0
+            present(n)
+            return
+        }
         if model.mode == .activity, let current = model.notification {
             if current.key == n.key {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { model.notification = n }
@@ -313,6 +322,41 @@ final class IslandController {
         scheduleHide(after: Prefs.displaySeconds + Self.peekSeconds)
     }
 
+    /// Show a Mac-side activity (charging, low battery, upcoming meeting).
+    func showSystem(_ a: SystemActivity) {
+        if model.mode == .activity, model.notification != nil {
+            // Busy with a phone card: meetings wait, battery blips are dropped.
+            if a.hasCard { pendingSystem = a }
+            return
+        }
+        if model.mode == .open && !a.hasCard { return }   // don't cover the dashboard for a battery blip
+        presentSystem(a)
+    }
+
+    private func presentSystem(_ a: SystemActivity) {
+        token += 1
+        let t = token
+        closeWork?.cancel()
+        returnToOpen = model.mode == .open
+        reposition()
+        model.notification = nil
+        model.system = a
+        model.expanded = false
+        model.replying = false
+        model.feedback = nil
+        model.queued = 0
+        model.stage = .compact
+        setMode(.activity, .spring(response: 0.38, dampingFraction: 0.62))
+        haptic()
+        if a.hasCard {
+            DispatchQueue.main.asyncAfter(deadline: .now() + Self.peekSeconds) { [weak self] in
+                guard let self, t == self.token else { return }
+                withAnimation(.spring(response: 0.46, dampingFraction: 0.68)) { self.model.stage = .full }
+            }
+        }
+        scheduleHide(after: a.duration + (a.hasCard ? Self.peekSeconds : 0))
+    }
+
     func hideActivity() {
         cancelHide()
         guard model.mode == .activity else { return }
@@ -327,11 +371,16 @@ final class IslandController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
             guard let self, t == self.token else { return }
             self.model.notification = nil
+            self.model.system = nil
             self.model.replying = false
             if let newest = self.queue.last {
                 self.model.queued = self.queue.count - 1   // the rest are in Recent / Phone tab
                 self.queue.removeAll()
                 self.present(newest)
+            } else if let waiting = self.pendingSystem {
+                self.pendingSystem = nil
+                self.model.queued = 0
+                if !self.isOver(waiting) { self.presentSystem(waiting) }
             } else {
                 self.model.queued = 0
             }
@@ -357,6 +406,12 @@ final class IslandController {
     }
 
     // MARK: - Misc
+
+    /// A queued meeting reminder is stale once the meeting has started more than a few minutes ago.
+    private func isOver(_ a: SystemActivity) -> Bool {
+        if case .meeting(let e) = a { return Date() > e.start.addingTimeInterval(5 * 60) }
+        return false
+    }
 
     private func haptic() {
         guard Prefs.haptics else { return }

@@ -8,6 +8,8 @@ final class SettingsModel: ObservableObject {
     var onPair: () -> Void = {}
     var onMirrorChanged: (Bool) -> Void = { _ in }
     var onLiveMusicChanged: (Bool) -> Void = { _ in }
+    var onCalendarChanged: (Bool) -> Void = { _ in }
+    @Published var calendarStatus = ""
 }
 
 struct SettingsView: View {
@@ -18,6 +20,9 @@ struct SettingsView: View {
     @AppStorage(Prefs.Key.displaySeconds) private var displaySeconds = 6.0
     @AppStorage(Prefs.Key.mirrorToNotificationCenter) private var mirror = false
     @AppStorage(Prefs.Key.liveMusic) private var liveMusic = true
+    @AppStorage(Prefs.Key.calendar) private var calendar = true
+    @AppStorage(Prefs.Key.meetingReminders) private var meetingReminders = true
+    @AppStorage(Prefs.Key.batteryAlerts) private var batteryAlerts = true
     @State private var loginError: String?
 
     var body: some View {
@@ -42,6 +47,16 @@ struct SettingsView: View {
                 }
                 Toggle("Also keep a copy in macOS Notification Center", isOn: $mirror)
                     .onChange(of: mirror) { _, on in model.onMirrorChanged(on) }
+            }
+            Section("Calendar & battery") {
+                Toggle("Show my calendar (Calendar tab, next event on Home)", isOn: $calendar)
+                    .onChange(of: calendar) { _, on in model.onCalendarChanged(on) }
+                if !model.calendarStatus.isEmpty {
+                    Text(model.calendarStatus).font(.caption).foregroundStyle(.secondary)
+                }
+                Toggle("Remind me 5 minutes before meetings", isOn: $meetingReminders)
+                    .disabled(!calendar)
+                Toggle("Show charging and low-battery alerts", isOn: $batteryAlerts)
             }
             Section("Phone") {
                 LabeledContent("Status", value: model.phoneStatus)

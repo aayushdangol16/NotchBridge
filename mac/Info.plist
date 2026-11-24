@@ -24,6 +24,10 @@
     <true/>
     <key>NSLocalNetworkUsageDescription</key>
     <string>NotchBridge receives your Android phone's notifications over your local Wi-Fi network.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>NotchBridge shows your upcoming events in the notch and reminds you a few minutes before meetings.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>NotchBridge shows your upcoming events in the notch and reminds you a few minutes before meetings.</string>
     <key>NSBonjourServices</key>
     <array>
         <string>_notchbridge._tcp</string>
