@@ -121,6 +121,11 @@ func minutesUntil(_ date: Date, now: Date = Date()) -> String {
     let m = Int((date.timeIntervalSince(now) / 60).rounded(.up))
     if m <= 0 { return "now" }
     if m < 60 { return "in \(m)m" }
+    if m >= 24 * 60 {
+        return Calendar.current.isDateInTomorrow(date)
+            ? "tomorrow " + date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+    }
     let h = m / 60, r = m % 60
     return r == 0 ? "in \(h)h" : "in \(h)h \(r)m"
 }

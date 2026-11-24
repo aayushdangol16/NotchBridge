@@ -6,6 +6,9 @@ import EventKit
 final class CalendarService {
     /// Main thread.
     var onEvents: ([CalEvent]) -> Void = { _ in }
+    /// How many event calendars this Mac has (0 = no accounts added to the Calendar app).
+    var onCalendarCount: (Int) -> Void = { _ in }
+    static let daysAhead = 7
     var onAccess: (IslandModel.CalendarAccess) -> Void = { _ in }
     var onMeetingSoon: (CalEvent) -> Void = { _ in }
 
@@ -63,13 +66,17 @@ final class CalendarService {
     private func reload() {
         let cal = Calendar.current
         let now = Date()
-        guard let end = cal.date(byAdding: .day, value: 2, to: cal.startOfDay(for: now)) else { return }
+        guard let end = cal.date(byAdding: .day, value: Self.daysAhead, to: cal.startOfDay(for: now)) else { return }
         let predicate = store.predicateForEvents(withStart: cal.startOfDay(for: now), end: end, calendars: nil)
         events = store.events(matching: predicate)
             .filter { $0.endDate > now && !Self.declined($0) && $0.status != .canceled }
             .map(Self.convert)
             .sorted { ($0.isAllDay ? 0 : 1, $0.start) < ($1.isAllDay ? 0 : 1, $1.start) }
         onEvents(events)
+        let calendars = store.calendars(for: .event)
+        onCalendarCount(calendars.count)
+        let sources = Set(calendars.map { $0.source.title }).sorted()
+        DebugLog.write("calendar: \(calendars.count) calendar(s) from [\(sources.joined(separator: ", "))], \(events.count) event(s) in the next \(Self.daysAhead) days")
     }
 
     /// Every 30 s: drop finished events and fire reminders for timed events starting within 5 minutes.

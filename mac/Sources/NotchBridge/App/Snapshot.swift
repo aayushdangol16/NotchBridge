@@ -64,6 +64,7 @@ enum Snapshot {
             m.phoneBattery = 82
             m.recent = [msg, wa]
             m.calendarAccess = .granted
+            m.calendarCount = 3
             m.events = events
             configure(m)
             return m
@@ -88,6 +89,8 @@ enum Snapshot {
             ("15-low-battery", model(.activity) { $0.notification = nil; $0.system = .lowBattery(level: 10); $0.stage = .compact }),
             ("16-meeting-card", model(.activity) { $0.notification = nil; $0.system = .meeting(events[0]) }),
             ("17-calendar-tab", model(.open) { $0.tab = .calendar }),
+            ("17b-calendar-free-day", model(.open) { $0.tab = .calendar; $0.events = [] }),
+            ("17c-calendar-no-calendars", model(.open) { $0.tab = .calendar; $0.events = []; $0.calendarCount = 0 }),
             ("18-home-next-event", model(.open)),
             ("19-shelf-empty-drop", model(.open) { $0.tab = .shelf; $0.dropTargeted = true }),
             ("20-shelf-items", model(.open) { m in

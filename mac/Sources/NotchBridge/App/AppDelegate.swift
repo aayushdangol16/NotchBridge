@@ -373,6 +373,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.onJoin = { url in NSWorkspace.shared.open(url) }
         m.onCalendarAccess = { [weak self] in self?.calendarAccessAction() }
         calendar.onEvents = { [weak m] events in m?.events = events }
+        calendar.onCalendarCount = { [weak m] n in m?.calendarCount = n }
         calendar.onAccess = { [weak self] access in
             self?.island.model.calendarAccess = access
             self?.settingsWindow.model.calendarStatus = Self.describe(access)

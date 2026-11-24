@@ -71,6 +71,8 @@ final class IslandModel: ObservableObject {
     enum CalendarAccess { case off, unknown, granted, denied }
     @Published var events: [CalEvent] = []
     @Published var calendarAccess: CalendarAccess = .off
+    @Published var calendarCount = 0
+    @Published var selectedDay = Calendar.current.startOfDay(for: Date())
 
     // Shelf
     @Published var shelfItems: [ShelfItem] = []
