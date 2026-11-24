@@ -94,6 +94,49 @@ final class CalendarService {
         }
     }
 
+    /// Adds an event to the default calendar (iCloud, Google… whatever Calendar.app uses for new events).
+    /// `minutes == 0` = all-day. Returns an error message, or nil on success.
+    func addEvent(title: String, start: Date, minutes: Int) -> String? {
+        guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return "Calendar access is off" }
+        let writable = { (c: EKCalendar?) -> EKCalendar? in c?.allowsContentModifications == true ? c : nil }
+        guard let calendar = writable(store.defaultCalendarForNewEvents)
+                ?? store.calendars(for: .event).first(where: { $0.allowsContentModifications }) else {
+            return "No calendar you can add events to"
+        }
+        let e = EKEvent(eventStore: store)
+        e.title = title
+        e.calendar = calendar
+        if minutes == 0 {
+            let day = Calendar.current.startOfDay(for: start)
+            e.isAllDay = true
+            e.startDate = day
+            e.endDate = day
+        } else {
+            e.startDate = start
+            e.endDate = start.addingTimeInterval(TimeInterval(minutes * 60))
+        }
+        if let link = Self.joinLink(in: [title]) { e.url = link }
+        do {
+            try store.save(e, span: .thisEvent, commit: true)
+            DebugLog.write("calendar: added an event to \(calendar.source.title)")
+            reload()
+            return nil
+        } catch {
+            return "Couldn't save: \(error.localizedDescription)"
+        }
+    }
+
+    /// Sensible start for a new event on `day`: the next half hour if it's today, else 9:00.
+    static func defaultStart(on day: Date, now: Date = Date()) -> Date {
+        let cal = Calendar.current
+        if cal.isDate(day, inSameDayAs: now) {
+            let next = cal.nextDate(after: now, matching: DateComponents(minute: 30), matchingPolicy: .nextTime) ?? now
+            let nextHour = cal.nextDate(after: now, matching: DateComponents(minute: 0), matchingPolicy: .nextTime) ?? now
+            return min(next, nextHour)
+        }
+        return cal.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
+    }
+
     private static func declined(_ e: EKEvent) -> Bool {
         e.attendees?.first(where: { $0.isCurrentUser })?.participantStatus == .declined
     }

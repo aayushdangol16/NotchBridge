@@ -89,6 +89,10 @@ enum Snapshot {
             ("15-low-battery", model(.activity) { $0.notification = nil; $0.system = .lowBattery(level: 10); $0.stage = .compact }),
             ("16-meeting-card", model(.activity) { $0.notification = nil; $0.system = .meeting(events[0]) }),
             ("17-calendar-tab", model(.open) { $0.tab = .calendar }),
+            ("17d-calendar-new-event", model(.open) { m in
+                m.tab = .calendar; m.addingEvent = true; m.newEventTitle = "Call with Ram"
+                m.newEventTime = CalendarService.defaultStart(on: Date())
+            }),
             ("17b-calendar-free-day", model(.open) { $0.tab = .calendar; $0.events = [] }),
             ("17c-calendar-no-calendars", model(.open) { $0.tab = .calendar; $0.events = []; $0.calendarCount = 0 }),
             ("18-home-next-event", model(.open)),

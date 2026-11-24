@@ -73,6 +73,13 @@ final class IslandModel: ObservableObject {
     @Published var calendarAccess: CalendarAccess = .off
     @Published var calendarCount = 0
     @Published var selectedDay = Calendar.current.startOfDay(for: Date())
+    // New-event form (Agenda tab)
+    @Published var addingEvent = false
+    @Published var newEventTitle = ""
+    @Published var newEventTime = Date()
+    @Published var newEventMinutes = 30          // 0 = all day
+    /// Typing in the dashboard (reply or new event): don't auto-close it.
+    var isTyping: Bool { rowReplyKey != nil || addingEvent }
 
     // Shelf
     @Published var shelfItems: [ShelfItem] = []
@@ -108,6 +115,8 @@ final class IslandModel: ObservableObject {
     var onMedia: (MediaCommand) -> Void = { _ in }
     var onClearAll: () -> Void = {}
     var onJoin: (URL) -> Void = { _ in }
+    /// title, start, minutes (0 = all day)
+    var onAddEvent: (String, Date, Int) -> Void = { _, _, _ in }
     var onDropProviders: ([NSItemProvider]) -> Void = { _ in }
     var onDropFiles: ([URL]) -> Void = { _ in }
     var onDragActivity: () -> Void = {}

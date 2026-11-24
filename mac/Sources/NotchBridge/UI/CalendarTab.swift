@@ -56,10 +56,20 @@ struct CalendarTab: View {
     private var dayColumn: some View {
         let list = events(on: selected)
         return VStack(alignment: .leading, spacing: 4) {
-            Text(cal.isDate(selected, inSameDayAs: today) ? "Today" : selected.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.8))
-            if list.isEmpty {
+            HStack(spacing: 6) {
+                Text(cal.isDate(selected, inSameDayAs: today) ? "Today" : selected.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+                if !model.addingEvent && model.calendarCount > 0 {
+                    RowIconButton(icon: "plus", help: "New event on this day", tint: .white) { startNewEvent() }
+                }
+            }
+            if model.addingEvent {
+                NewEventForm(model: model, day: selected)
+                    .transition(.opacity)
+            } else if list.isEmpty {
                 Spacer(minLength: 0)
                 Text(model.calendarCount == 0 ? "No calendars on this Mac" : "No events")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
@@ -86,6 +96,14 @@ struct CalendarTab: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    private func startNewEvent() {
+        model.newEventTitle = ""
+        model.newEventTime = CalendarService.defaultStart(on: selected)
+        model.newEventMinutes = 30
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.addingEvent = true }
+        model.onNeedKeyboard()
+    }
+
     private func placeholder(icon: String, text: String, button: String? = nil, action: @escaping () -> Void = {}) -> some View {
         VStack(spacing: 7) {
             Image(systemName: icon).font(.system(size: 20)).foregroundStyle(.white.opacity(0.3))
@@ -95,6 +113,76 @@ struct CalendarTab: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Inline "new event" form: title, start time, length (or all day). Saves to the selected day.
+struct NewEventForm: View {
+    @ObservedObject var model: IslandModel
+    let day: Date
+    @FocusState private var titleFocused: Bool
+
+    private static let lengths: [(String, Int)] = [("15 min", 15), ("30 min", 30), ("1 hour", 60), ("2 hours", 120), ("All day", 0)]
+    private var lengthLabel: String { Self.lengths.first { $0.1 == model.newEventMinutes }?.0 ?? "\(model.newEventMinutes) min" }
+    private var canAdd: Bool { !model.newEventTitle.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            TextField("", text: $model.newEventTitle, prompt: Text("Event title").foregroundStyle(.white.opacity(0.35)))
+                .textFieldStyle(.plain)
+                .font(.system(size: 12, design: .rounded))
+                .foregroundStyle(.white)
+                .focused($titleFocused)
+                .onSubmit(add)
+                .onExitCommand(perform: cancel)
+                .padding(.horizontal, 9)
+                .frame(height: 24)
+                .background(Capsule().fill(.white.opacity(0.09)))
+                .overlay(Capsule().stroke(.white.opacity(titleFocused ? 0.35 : 0.1), lineWidth: 1))
+
+            HStack(spacing: 6) {
+                if model.newEventMinutes != 0 {
+                    DatePicker("", selection: $model.newEventTime, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                        .datePickerStyle(.field)
+                        .controlSize(.small)
+                        .fixedSize()
+                }
+                Menu {
+                    ForEach(Self.lengths, id: \.1) { item in
+                        Button(item.0) { model.newEventMinutes = item.1 }
+                    }
+                } label: {
+                    Text(lengthLabel).font(.system(size: 11, weight: .medium, design: .rounded))
+                }
+                .menuStyle(.borderlessButton)
+                .controlSize(.small)
+                .fixedSize()
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 6) {
+                Spacer(minLength: 0)
+                IslandButton(title: "Cancel", icon: nil, style: .secondary, action: cancel)
+                IslandButton(title: "Add", icon: "plus", style: .primary(canAdd ? .white : .white.opacity(0.3)), action: add)
+                    .disabled(!canAdd)
+            }
+        }
+        .onAppear { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { titleFocused = true } }
+    }
+
+    private func add() {
+        let title = model.newEventTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !title.isEmpty else { return }
+        let cal = Calendar.current
+        let t = cal.dateComponents([.hour, .minute], from: model.newEventTime)
+        let start = cal.date(bySettingHour: t.hour ?? 9, minute: t.minute ?? 0, second: 0, of: day) ?? day
+        model.onAddEvent(title, start, model.newEventMinutes)
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.addingEvent = false }
+    }
+
+    private func cancel() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { model.addingEvent = false }
     }
 }
 

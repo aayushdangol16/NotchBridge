@@ -374,6 +374,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.onCalendarAccess = { [weak self] in self?.calendarAccessAction() }
         calendar.onEvents = { [weak m] events in m?.events = events }
         calendar.onCalendarCount = { [weak m] n in m?.calendarCount = n }
+        m.onAddEvent = { [weak self] title, start, minutes in
+            guard let self else { return }
+            if let error = self.calendar.addEvent(title: title, start: start, minutes: minutes) {
+                self.island.toast(error, isError: true)
+            } else {
+                self.island.toast("Added “\(title)” to your calendar")
+            }
+        }
         calendar.onAccess = { [weak self] access in
             self?.island.model.calendarAccess = access
             self?.settingsWindow.model.calendarStatus = Self.describe(access)

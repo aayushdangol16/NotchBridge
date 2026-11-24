@@ -43,6 +43,7 @@ final class IslandController {
     /// `interactive: false` builds an invisible, untracked instance for `--selftest`.
     init(interactive: Bool = true) {
         let host = NSHostingView(rootView: IslandView(model: model))
+        host.appearance = NSAppearance(named: .darkAqua)   // the island is always black: dark text fields, pickers, menus
         host.frame = CGRect(origin: .zero, size: Self.panelSize)
         panel.contentView = host
         if !interactive { panel.alphaValue = 0 }
@@ -184,7 +185,7 @@ final class IslandController {
         case .open:
             let work = DispatchWorkItem { [weak self] in
                 // Don't yank the dashboard away from someone typing a reply in it.
-                guard let self, !self.pointerInside, self.model.rowReplyKey == nil else { return }
+                guard let self, !self.pointerInside, !self.model.isTyping else { return }
                 if self.holdingForDrag {
                     // A file is still being dragged: check again shortly instead of closing now.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
@@ -290,6 +291,7 @@ final class IslandController {
         model.rowReplyKey = nil
         model.rowReplyText = ""
         model.openRowKey = nil
+        model.addingEvent = false
         setMode(pointerInside ? .peek : .idle, .spring(response: 0.38, dampingFraction: 0.86))
     }
 

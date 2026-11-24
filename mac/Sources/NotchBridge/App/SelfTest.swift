@@ -302,6 +302,28 @@ enum SelfTest {
         check("drag ends away from the notch -> closes", m.mode == .idle && !m.fileDragActive)
         m.tab = .home
 
+        // --- New event form ---
+        let cal = Calendar.current
+        let morning = cal.date(bySettingHour: 10, minute: 10, second: 0, of: Date())!
+        let s1 = CalendarService.defaultStart(on: morning, now: morning)
+        check("new event today starts at the next half hour (10:10 -> 10:30)",
+              cal.component(.hour, from: s1) == 10 && cal.component(.minute, from: s1) == 30)
+        let late = cal.date(bySettingHour: 10, minute: 40, second: 0, of: Date())!
+        let s2 = CalendarService.defaultStart(on: late, now: late)
+        check("10:40 -> 11:00", cal.component(.hour, from: s2) == 11 && cal.component(.minute, from: s2) == 0)
+        let tomorrow = cal.date(byAdding: .day, value: 1, to: cal.startOfDay(for: Date()))!
+        let s3 = CalendarService.defaultStart(on: tomorrow)
+        check("new event on another day starts at 9:00", cal.component(.hour, from: s3) == 9 && cal.isDate(s3, inSameDayAs: tomorrow))
+        c.pointerMoved(notch); spin(0.2)
+        m.onOpenDashboard(); spin(0.3)
+        m.addingEvent = true
+        c.pointerMoved(far); spin(0.8)
+        check("dashboard stays open while typing a new event", m.mode == .open)
+        m.addingEvent = false
+        c.pointerMoved(notch); spin(0.1)
+        c.pointerMoved(far); spin(0.8)
+        check("…and closes normally afterwards", m.mode == .idle)
+
         // --- Phase 6: volume strip ---
         c.showSystem(.volume(level: 40, muted: false)); spin(0.3)
         check("volume change -> strip", m.mode == .activity && m.system == .volume(level: 40, muted: false))
