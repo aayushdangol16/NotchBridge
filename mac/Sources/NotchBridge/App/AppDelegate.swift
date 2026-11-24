@@ -326,6 +326,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         m.onDropFiles = { [weak self] urls in
             guard let self else { return }
             let added = self.shelf.add(urls)
+            DebugLog.write("drop: shelf added \(added) of \(urls.count)")
             if added > 0 { self.island.toast(added == 1 ? "Added to the shelf" : "Added \(added) files to the shelf") }
         }
         m.onShelfRemove = { [weak self] item in self?.shelf.remove(item) }

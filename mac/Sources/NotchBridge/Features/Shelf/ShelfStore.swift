@@ -56,13 +56,22 @@ final class ShelfStore: ObservableObject {
     func remove(_ item: ShelfItem) {
         items.removeAll { $0.id == item.id }
         thumbnails[item.id] = nil
+        deleteIfOurCopy(item)
         save()
     }
 
     func clear() {
+        items.forEach(deleteIfOurCopy)
         items.removeAll()
         thumbnails.removeAll()
         save()
+    }
+
+    /// Copies we made of images / promised files / links are ours to delete; real files never are.
+    private func deleteIfOurCopy(_ item: ShelfItem) {
+        if item.path.hasPrefix(ShelfDrop.filesDirectory.path) {
+            try? FileManager.default.removeItem(atPath: item.path)
+        }
     }
 
     func icon(for item: ShelfItem) -> NSImage {

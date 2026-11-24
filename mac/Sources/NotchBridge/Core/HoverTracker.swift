@@ -15,6 +15,17 @@ final class HoverTracker {
     private var wasPressed = false
     private var dragBaseline = NSPasteboard(name: .drag).changeCount
 
+    /// Drags the shelf can take: files, promised files, images, links.
+    private static let droppableTypes: Set<NSPasteboard.PasteboardType> = [
+        .fileURL, .URL, .tiff, .png, .pdf,
+        NSPasteboard.PasteboardType("public.jpeg"),
+        NSPasteboard.PasteboardType("com.apple.pasteboard.promised-file-url"),
+        NSPasteboard.PasteboardType("com.apple.pasteboard.promised-file-content-type"),
+        NSPasteboard.PasteboardType("com.apple.NSFilePromiseItemMetaData"),
+        NSPasteboard.PasteboardType("NSPromiseContentsPboardType"),
+        NSPasteboard.PasteboardType("Apple files promise pasteboard type"),
+    ]
+
     func start() {
         // Pointer position is polled (cheap: one read, 20×/s) rather than taken from a global
         // mouse-moved monitor, which makes the window server copy every mouse event into our
@@ -51,7 +62,13 @@ final class HoverTracker {
         var fileDrag = false
         if pressed {
             let pb = NSPasteboard(name: .drag)
-            if pb.changeCount != dragBaseline { fileDrag = pb.types?.contains(.fileURL) ?? false }
+            if pb.changeCount != dragBaseline {
+                let types = pb.types ?? []
+                fileDrag = !Self.droppableTypes.isDisjoint(with: types)
+                if fileDrag != lastFileDrag {
+                    DebugLog.write("drag: started droppable=\(fileDrag) types=\(types.prefix(5).map(\.rawValue))")
+                }
+            }
         } else if wasPressed {
             dragBaseline = NSPasteboard(name: .drag).changeCount
         }

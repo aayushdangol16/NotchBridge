@@ -3,23 +3,86 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum ShelfDrop {
-    /// File URLs from dropped item providers (Finder, Desktop, most apps).
+    /// What the island accepts: real files, promised files (Mail/Messages attachments, Photos,
+    /// screenshot thumbnails, browser images), raw images and web links.
+    static let acceptedTypes: [UTType] = [.fileURL, .image, .url, .data]
+
+    /// Where copies of non-file drops (images, promised files, links) are kept.
+    static var filesDirectory: URL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("NotchBridge/Shelf Files", isDirectory: true)
+
+    /// Turns dropped item providers into file URLs, copying anything that isn't already a file.
     static func loadURLs(_ providers: [NSItemProvider], completion: @escaping ([URL]) -> Void) {
         let group = DispatchGroup()
         let lock = NSLock()
         var urls: [URL] = []
-        for p in providers where p.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
-            group.enter()
-            p.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                var url: URL?
-                if let d = item as? Data { url = URL(dataRepresentation: d, relativeTo: nil) }
-                else if let u = item as? URL { url = u }
-                else if let s = item as? String { url = URL(string: s) }
-                if let url { lock.lock(); urls.append(url); lock.unlock() }
-                group.leave()
+        func add(_ url: URL?) { if let url { lock.lock(); urls.append(url); lock.unlock() } }
+        try? FileManager.default.createDirectory(at: filesDirectory, withIntermediateDirectories: true)
+
+        for p in providers {
+            let types = p.registeredTypeIdentifiers
+            DebugLog.write("drop: provider types=\(types.prefix(6))")
+            if p.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+                // A real file (Finder, Desktop…)
+                group.enter()
+                p.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, error in
+                    var url: URL?
+                    if let d = item as? Data { url = URL(dataRepresentation: d, relativeTo: nil) }
+                    else if let u = item as? URL { url = u }
+                    else if let s = item as? String { url = URL(string: s) }
+                    if url == nil { DebugLog.write("drop: file url unreadable: \(error?.localizedDescription ?? "unknown")") }
+                    add(url)
+                    group.leave()
+                }
+            } else if p.hasItemConformingToTypeIdentifier(UTType.url.identifier), p.canLoadObject(ofClass: NSURL.self) {
+                // A web link: keep it as a .webloc that opens in the browser.
+                group.enter()
+                _ = p.loadObject(ofClass: NSURL.self) { obj, _ in
+                    defer { group.leave() }
+                    guard let link = obj as? URL, let scheme = link.scheme, scheme.hasPrefix("http") else { return }
+                    let dest = uniqueURL(base: link.host ?? "Link", ext: "webloc")
+                    let plist: [String: String] = ["URL": link.absoluteString]
+                    if let data = try? PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0),
+                       (try? data.write(to: dest)) != nil {
+                        add(dest)
+                    }
+                }
+            } else if let type = types.first(where: { UTType($0)?.conforms(to: .data) == true && !$0.hasPrefix("dyn.") }) {
+                // Promised file or raw data (image, PDF…): copy it into our folder.
+                group.enter()
+                p.loadFileRepresentation(forTypeIdentifier: type) { tmp, error in
+                    defer { group.leave() }
+                    guard let tmp else {
+                        DebugLog.write("drop: no file for \(type): \(error?.localizedDescription ?? "unknown")")
+                        return
+                    }
+                    let ext = tmp.pathExtension.isEmpty ? (UTType(type)?.preferredFilenameExtension ?? "") : tmp.pathExtension
+                    let base = p.suggestedName.flatMap { ($0 as NSString).deletingPathExtension } ?? tmp.deletingPathExtension().lastPathComponent
+                    let dest = uniqueURL(base: base.isEmpty ? "Dropped item" : base, ext: ext)
+                    do {
+                        try FileManager.default.copyItem(at: tmp, to: dest)
+                        add(dest)
+                    } catch {
+                        DebugLog.write("drop: copy failed: \(error.localizedDescription)")
+                    }
+                }
             }
         }
-        group.notify(queue: .main) { completion(urls) }
+        group.notify(queue: .main) {
+            DebugLog.write("drop: \(providers.count) item(s) -> \(urls.count) file(s)")
+            completion(urls)
+        }
+    }
+
+    private static func uniqueURL(base: String, ext: String) -> URL {
+        let clean = base.replacingOccurrences(of: "/", with: "-")
+        var url = filesDirectory.appendingPathComponent(clean).appendingPathExtension(ext)
+        var n = 2
+        while FileManager.default.fileExists(atPath: url.path) {
+            url = filesDirectory.appendingPathComponent("\(clean) \(n)").appendingPathExtension(ext)
+            n += 1
+        }
+        return url
     }
 }
 

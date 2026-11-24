@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// `NotchBridge --selftest` drives an invisible IslandController with synthetic pointer positions,
 /// gestures and notifications, and checks every state transition. Exit code 0 = all passed.
@@ -234,6 +235,33 @@ enum SelfTest {
         check("missing files dropped on load", ShelfStore(directory: tmp).items.map(\.name) == ["report.pdf"])
         shelf.remove(shelf.items[0])
         check("remove", shelf.items.count == 1)
+
+        // Drop handler: a real file, raw image data (like a browser image), and a web link.
+        let savedDir = ShelfDrop.filesDirectory
+        ShelfDrop.filesDirectory = tmp.appendingPathComponent("Shelf Files")
+        defer { ShelfDrop.filesDirectory = savedDir }
+        let pngData = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 4, pixelsHigh: 4, bitsPerSample: 8,
+                                       samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                       bytesPerRow: 0, bitsPerPixel: 0)!.representation(using: .png, properties: [:])!
+        let imageProvider = NSItemProvider(item: pngData as NSData, typeIdentifier: UTType.png.identifier)
+        imageProvider.suggestedName = "Browser image"
+        let providers = [NSItemProvider(contentsOf: f1)!, imageProvider, NSItemProvider(object: NSURL(string: "https://example.com/page")!)]
+        var dropped: [URL]?
+        ShelfDrop.loadURLs(providers) { dropped = $0 }
+        for _ in 0..<40 where dropped == nil { spin(0.05) }
+        let names = (dropped ?? []).map(\.lastPathComponent)
+        print("  dropped: \(names)")
+        check("dropping a Finder file gives that file", names.contains("report.pdf"))
+        check("dropping image data saves a copy", names.contains("Browser image.png"))
+        check("dropping a web link saves a .webloc", names.contains("example.com.webloc"))
+        let copy = (dropped ?? []).first { $0.lastPathComponent == "Browser image.png" }
+        if let copy {
+            let s2 = ShelfStore(directory: tmp)
+            s2.add([copy])
+            if let item = s2.items.first(where: { $0.path == copy.path }) { s2.remove(item) }
+            check("removing a copied drop deletes the copy (never real files)",
+                  !FileManager.default.fileExists(atPath: copy.path) && FileManager.default.fileExists(atPath: f1.path))
+        }
 
         c.pointerMoved(far); spin(0.4)
         let nearNotch = CGPoint(x: c.dragZone.maxX - 20, y: c.dragZone.minY + 8)

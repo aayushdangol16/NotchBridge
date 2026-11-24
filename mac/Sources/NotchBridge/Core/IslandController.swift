@@ -117,6 +117,7 @@ final class IslandController {
             if model.mode == .open {
                 if model.tab != .shelf { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { model.tab = .shelf } }
             } else {
+                DebugLog.write("drag: near the notch -> opening Shelf")
                 openDashboard(tab: .shelf)
             }
         }

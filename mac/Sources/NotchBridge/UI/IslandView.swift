@@ -79,10 +79,12 @@ struct IslandView: View {
                 .animation(.easeOut(duration: 0.15), value: model.dropTargeted)
         }
         .contentShape(shape)
-        .onDrop(of: [.fileURL], isTargeted: $model.dropTargeted) { providers in
+        .onDrop(of: ShelfDrop.acceptedTypes, isTargeted: $model.dropTargeted) { providers in
+            DebugLog.write("drop: released on island with \(providers.count) item(s)")
             model.onDropProviders(providers)
             return true
         }
+        .onChange(of: model.dropTargeted) { _, on in DebugLog.write("drag: over island = \(on)") }
         .onTapGesture {
             if model.mode == .peek || model.mode == .idle { model.onOpenDashboard() }
         }
