@@ -1,5 +1,6 @@
 package com.notchbridge.android
 
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.RemoteInput
@@ -17,7 +18,12 @@ import org.json.JSONObject
  */
 class NotificationCaptureService : NotificationListenerService() {
 
+    /** Keys currently posted on the phone, so we can tell a new notification from an update. */
+    private val activeKeys = HashSet<String>()
+
     override fun onListenerConnected() {
+        activeKeys.clear()
+        runCatching { activeNotifications }.getOrNull()?.forEach { activeKeys.add(it.key) }
         Bridge.listenerService = this
         Bridge.listenerAttached()
         BridgeService.start(this)
@@ -30,11 +36,19 @@ class NotificationCaptureService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        val isUpdate = !activeKeys.add(sbn.key)
         if (!NotificationMapper.shouldForward(packageName, sbn)) return
-        Bridge.posted(sbn, isSilent(sbn))
+        val silent = isSilent(sbn)
+        // Mirror Android's own decision: an update flagged "only alert once" doesn't buzz the phone,
+        // so it shouldn't pop on the Mac either. (WhatsApp re-posts every unread chat this way
+        // whenever a new message arrives.)
+        val alertOnce = sbn.notification.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0
+        val alert = !silent && !(alertOnce && isUpdate)
+        Bridge.posted(sbn, silent, alert)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        activeKeys.remove(sbn.key)
         if (sbn.packageName == packageName) return
         Bridge.removed(sbn.key)
     }

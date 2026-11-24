@@ -20,15 +20,17 @@ object NotificationMapper {
     fun shouldForward(ownPackage: String, sbn: StatusBarNotification): Boolean {
         if (sbn.packageName == ownPackage) return false
         val n = sbn.notification
-        if (sbn.isOngoing) return false                                        // music, downloads, navigation…
+        // Ringing calls (WhatsApp, Phone, Messenger…) are ongoing foreground notifications, but we want them.
+        val incomingCall = n.category == Notification.CATEGORY_CALL && n.fullScreenIntent != null
+        if (sbn.isOngoing && !incomingCall) return false                       // music, downloads, navigation…
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return false     // "3 new messages" summaries
-        if (n.flags and Notification.FLAG_FOREGROUND_SERVICE != 0) return false
+        if (n.flags and Notification.FLAG_FOREGROUND_SERVICE != 0 && !incomingCall) return false
         val e = n.extras
         return !(e.getCharSequence(Notification.EXTRA_TITLE).isNullOrBlank() &&
             e.getCharSequence(Notification.EXTRA_TEXT).isNullOrBlank())
     }
 
-    fun toJson(ctx: Context, sbn: StatusBarNotification, silent: Boolean, includeAppIcon: Boolean): JSONObject {
+    fun toJson(ctx: Context, sbn: StatusBarNotification, silent: Boolean, alert: Boolean, includeAppIcon: Boolean): JSONObject {
         val n = sbn.notification
         val e = n.extras
         val title = e.getCharSequence(Notification.EXTRA_TITLE_BIG) ?: e.getCharSequence(Notification.EXTRA_TITLE)
@@ -50,6 +52,8 @@ object NotificationMapper {
             .put("time", sbn.postTime)
             .put("actions", actions)
             .put("silent", silent)
+            .put("alert", alert)
+            .put("call", n.category == Notification.CATEGORY_CALL)
             .put("alertOnce", n.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         if (!sub.isNullOrBlank()) json.put("sub", sub.toString())
 

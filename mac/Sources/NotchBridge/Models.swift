@@ -25,6 +25,8 @@ struct WireNotification: Codable {
     let large: String?  // base64 PNG large icon / avatar
     let silent: Bool?   // low-importance channel: list it, don't pop it
     let alertOnce: Bool?
+    let alert: Bool?    // the phone's own verdict: did/would this buzz the phone? (newer phone app)
+    let call: Bool?     // incoming call
 }
 
 /// Phone -> Mac

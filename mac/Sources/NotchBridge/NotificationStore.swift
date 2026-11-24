@@ -40,13 +40,15 @@ final class NotificationStore: ObservableObject {
         items.insert(n, at: 0)
         if items.count > maxItems { items.removeLast(items.count - maxItems) }
 
-        // Pop up when the notification is new or its text changed (a new message in the same chat).
-        // We deliberately ignore Android's "only alert once" flag: Messenger sets it on every update
-        // of a conversation, which would hide new messages. Unchanged re-posts still don't pop.
+        // Pop up only when the phone itself alerted for it (it knows whether this is a fresh post or a
+        // quiet "alert once" update — WhatsApp re-posts every unread chat that way on each new message),
+        // and only if the text actually changed, so pure refreshes (avatar loaded…) stay quiet.
         let silent = w.silent ?? false
-        let alert = mayAlert && contentChanged && !silent
+        let phoneAlert = w.alert ?? (!silent && !(existing != nil && (w.alertOnce ?? false)))  // older phone app
+        let alert = mayAlert && contentChanged && phoneAlert
         DebugLog.write("posted pkg=\(w.pkg) new=\(existing == nil) changed=\(contentChanged) silent=\(silent) " +
-                       "alertOnce=\(w.alertOnce ?? false) mayAlert=\(mayAlert) -> \(alert ? "POP" : "list only")")
+                       "alertOnce=\(w.alertOnce ?? false) phoneAlert=\(w.alert.map(String.init) ?? "n/a") " +
+                       "mayAlert=\(mayAlert) -> \(alert ? "POP" : "list only")")
         if alert { onAlert?(n) }
     }
 

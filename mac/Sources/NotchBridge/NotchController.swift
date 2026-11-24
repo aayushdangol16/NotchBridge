@@ -60,7 +60,8 @@ final class NotchController {
 
     let model = NotchModel()
     private let panel = NotchPanel()
-    private var queue: [PhoneNotification] = [] { didSet { model.queued = queue.count } }
+    /// Notifications that arrived while the user was busy with the card (replying / actions open).
+    private var queue: [PhoneNotification] = []
     private var hideWork: DispatchWorkItem?
     private var hovering = false
     private var hideToken = 0
@@ -111,13 +112,25 @@ final class NotchController {
             return
         }
         if model.current != nil {
-            queue.removeAll { $0.key == n.key }
-            queue.append(n)
-            if queue.count > 5 { queue.removeFirst(queue.count - 5) }
-            // Don't interrupt someone typing a reply; otherwise move on sooner.
-            if !model.expanded && !hovering { scheduleHide(after: 1.5) }
+            if model.isVisible && !model.expanded && !model.replying {
+                // Newest wins: swap the card's content in place and count what else arrived ("+N"),
+                // instead of replaying a backlog one card at a time.
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                    model.current = n
+                    model.queued += 1
+                    model.feedback = nil
+                }
+                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+                if !hovering { scheduleHide(after: Self.displaySeconds) }
+            } else {
+                // Busy (typing a reply / closing): show only the newest one afterwards.
+                queue.removeAll { $0.key == n.key }
+                queue.append(n)
+                model.queued = queue.count
+            }
             return
         }
+        model.queued = 0
         present(n)
     }
 
@@ -175,10 +188,13 @@ final class NotchController {
             guard let self, token == self.hideToken else { return }
             self.model.current = nil
             self.model.replying = false
-            if let next = self.queue.first {
-                self.queue.removeFirst()
+            if let next = self.queue.last {
+                // Only the most recent; the others are in "Recent notifications".
+                self.model.queued = self.queue.count - 1
+                self.queue.removeAll()
                 self.present(next)
             } else {
+                self.model.queued = 0
                 // Keep it ordered in (see init); just stop it from catching clicks.
                 self.panel.ignoresMouseEvents = true
             }

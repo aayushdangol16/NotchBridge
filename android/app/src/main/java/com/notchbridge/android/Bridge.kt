@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import okhttp3.OkHttpClient
@@ -41,8 +42,11 @@ object Bridge {
     private const val TAG = "NotchBridge"
     private const val SERVICE_TYPE = "_notchbridge._tcp."
     private const val BAD_KEY_CODE = 4001
-    private const val DISCOVERY_TIMEOUT_MS = 10_000L
-    private const val MAX_RETRY_MS = 30_000L
+    private const val DISCOVERY_TIMEOUT_MS = 8_000L
+    private const val MAX_RETRY_MS = 10_000L
+    private const val OUTBOX_LIMIT = 40
+    /** Notifications missed while disconnected still pop on the Mac if they are at most this old. */
+    private const val MISSED_ALERT_WINDOW_MS = 120_000L
 
     private lateinit var app: Context
     private val thread = HandlerThread("notchbridge").apply { start() }
@@ -71,6 +75,10 @@ object Bridge {
     private var resolving = false
     private var crypto: Crypto? = null
     private val iconsSent = HashSet<String>()
+
+    /** Notifications posted while the Mac was unreachable, delivered when it comes back (newest copy per key). */
+    private class Pending(val sbn: StatusBarNotification, val silent: Boolean, val alert: Boolean, val at: Long)
+    private val outbox = LinkedHashMap<String, Pending>()
 
     fun init(context: Context) {
         if (initialized) return
@@ -108,6 +116,7 @@ object Bridge {
 
     fun unpair() = handler.post {
         disconnect()
+        outbox.clear()
         PairingStore.clear(app)
         setStatus(State.NOT_PAIRED, null)
     }
@@ -116,16 +125,38 @@ object Bridge {
         if (status.state == State.CONNECTED) sendSync()
     }
 
-    fun posted(sbn: StatusBarNotification, silent: Boolean) = handler.post {
-        if (status.state != State.CONNECTED) return@post
-        val firstFromApp = iconsSent.add(sbn.packageName)
-        val n = runCatching { NotificationMapper.toJson(app, sbn, silent, includeAppIcon = firstFromApp) }
-            .onFailure { Log.w(TAG, "map failed", it) }.getOrNull() ?: return@post
-        send(JSONObject().put("type", "posted").put("n", n))
+    fun posted(sbn: StatusBarNotification, silent: Boolean, alert: Boolean) = handler.post {
+        if (status.state != State.CONNECTED) {
+            // Mac asleep / Wi-Fi blip / reconnecting: keep it and deliver after "welcome".
+            outbox.remove(sbn.key)
+            outbox[sbn.key] = Pending(sbn, silent, alert, SystemClock.elapsedRealtime())
+            while (outbox.size > OUTBOX_LIMIT) outbox.remove(outbox.keys.first())
+            return@post
+        }
+        sendPosted(sbn, silent, alert)
     }
 
     fun removed(key: String) = handler.post {
+        outbox.remove(key)
         if (status.state == State.CONNECTED) send(JSONObject().put("type", "removed").put("key", key))
+    }
+
+    private fun sendPosted(sbn: StatusBarNotification, silent: Boolean, alert: Boolean) {
+        val firstFromApp = iconsSent.add(sbn.packageName)
+        val n = runCatching { NotificationMapper.toJson(app, sbn, silent, alert, includeAppIcon = firstFromApp) }
+            .onFailure { Log.w(TAG, "map failed", it) }.getOrNull() ?: return
+        send(JSONObject().put("type", "posted").put("n", n))
+    }
+
+    /** Deliver what arrived while disconnected. Only recent ones may pop; older ones just go in the list. */
+    private fun flushOutbox() {
+        if (outbox.isEmpty()) return
+        val now = SystemClock.elapsedRealtime()
+        Log.i(TAG, "delivering ${outbox.size} notifications missed while disconnected")
+        for (p in outbox.values) {
+            sendPosted(p.sbn, p.silent, p.alert && now - p.at <= MISSED_ALERT_WINDOW_MS)
+        }
+        outbox.clear()
     }
 
     fun sendTest() = handler.post {
@@ -138,6 +169,7 @@ object Bridge {
             .put("text", "If you can read this in your Mac's notch, everything works. 🎉")
             .put("time", System.currentTimeMillis())
             .put("actions", JSONArray())
+            .put("alert", true)
         send(JSONObject().put("type", "posted").put("n", n))
     }
 
@@ -215,6 +247,8 @@ object Bridge {
             "welcome" -> {
                 retryDelayMs = 2_000L
                 setStatus(State.CONNECTED, json.optString("name").ifBlank { status.macName })
+                // Missed notifications first (they may pop), then the full list (which never pops).
+                flushOutbox()
                 sendSync()
             }
             "dismiss", "action", "reply" -> {
@@ -233,7 +267,7 @@ object Bridge {
         val list = JSONArray()
         for ((sbn, silent) in svc.forwardable()) {
             val first = iconsSent.add(sbn.packageName)
-            runCatching { NotificationMapper.toJson(app, sbn, silent, includeAppIcon = first) }
+            runCatching { NotificationMapper.toJson(app, sbn, silent, alert = false, includeAppIcon = first) }
                 .getOrNull()?.let(list::put)
         }
         send(JSONObject().put("type", "sync").put("list", list))
