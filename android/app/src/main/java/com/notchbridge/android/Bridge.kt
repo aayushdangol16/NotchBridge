@@ -248,6 +248,7 @@ object Bridge {
         val wasConnected = status.state == State.CONNECTED
         socket = null
         iconsSent.clear()
+        FileReceiver.abortAll(app)
         if (status.state == State.KEY_REJECTED) return
         when {
             wasConnected -> { retryDelayMs = 1_000L; scheduleRetry(cfg) }
@@ -275,6 +276,9 @@ object Bridge {
             }
             "ring_stop" -> PhoneFinder.stop(app)
             "media_cmd" -> MediaWatcher.command(json.optString("cmd"))
+            "file_begin" -> FileReceiver.begin(app, json)?.let(::send)
+            "file_chunk" -> FileReceiver.chunk(app, json)?.let(::send)
+            "file_end" -> send(FileReceiver.end(app, json))
             "dismiss", "action", "reply" -> {
                 val result = listenerService?.perform(json)
                     ?: if (json.optString("type") == "dismiss") null

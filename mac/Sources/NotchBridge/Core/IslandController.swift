@@ -19,6 +19,7 @@ final class IslandController {
     private var islandSize: CGSize = .zero
     private var pointer = CGPoint(x: -10_000, y: -10_000)
     private(set) var pointerInside = false
+    private var fileDragging = false
 
     // Activity
     private var queue: [PhoneNotification] = []      // arrived while the user was busy with a card
@@ -56,7 +57,7 @@ final class IslandController {
         panel.orderFrontRegardless()
 
         if interactive {
-            hover.onMove = { [weak self] p in self?.pointerMoved(p) }
+            hover.onMove = { [weak self] p, fileDrag in self?.pointerMoved(p, fileDrag: fileDrag) }
             hover.onMouseDownOutside = { [weak self] p in self?.mouseDownOutside(p) }
             hover.onScroll = { [weak self] e in self?.scrolled(e) }
             hover.start()
@@ -76,6 +77,15 @@ final class IslandController {
             self.panel.makeKey()
         }
         model.onOpenDashboard = { [weak self] in self?.openDashboard() }
+        model.onDropProviders = { [weak self] providers in
+            ShelfDrop.loadURLs(providers) { urls in
+                guard let self, !urls.isEmpty else { return }
+                self.model.onDropFiles(urls)
+                if self.model.mode == .open, self.model.tab != .shelf {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { self.model.tab = .shelf }
+                }
+            }
+        }
         model.onCloseDashboard = { [weak self] in self?.closeDashboard() }
         model.onIslandSize = { [weak self] size in
             guard let self, size != self.islandSize else { return }
@@ -92,8 +102,27 @@ final class IslandController {
         return geometry.topCenterRect(size)
     }
 
-    func pointerMoved(_ p: CGPoint) {
+    /// Bigger target while dragging a file toward the notch.
+    var dragZone: CGRect {
+        geometry.topCenterRect(CGSize(width: geometry.notchSize.width + 180, height: geometry.notchSize.height + 44))
+    }
+
+    func pointerMoved(_ p: CGPoint, fileDrag: Bool = false) {
         pointer = p
+        var dragJustEnded = false
+        if fileDrag != fileDragging {
+            dragJustEnded = fileDragging && !fileDrag
+            fileDragging = fileDrag
+            model.fileDragActive = fileDrag
+        }
+        // Dragging a file toward the notch opens the Shelf so it can be dropped there.
+        if fileDrag, model.mode != .activity, dragZone.union(islandRect).contains(p) {
+            if model.mode == .open {
+                if model.tab != .shelf { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { model.tab = .shelf } }
+            } else {
+                openDashboard(tab: .shelf)
+            }
+        }
         let zone: CGRect
         if model.mode == .idle {
             // The live music strip is visible while idle, so it is hoverable too.
@@ -106,6 +135,8 @@ final class IslandController {
             pointerInside = inside
             model.hovering = inside
             inside ? pointerEntered() : pointerExited()
+        } else if dragJustEnded && !inside && model.mode == .open {
+            pointerExited()   // the close was held back while the file was being dragged
         }
         updateMouseCapture()
     }
@@ -138,7 +169,7 @@ final class IslandController {
         case .open:
             let work = DispatchWorkItem { [weak self] in
                 // Don't yank the dashboard away from someone typing a reply in it.
-                guard let self, !self.pointerInside, self.model.rowReplyKey == nil else { return }
+                guard let self, !self.pointerInside, self.model.rowReplyKey == nil, !self.fileDragging else { return }
                 self.closeDashboard()
             }
             closeWork = work
@@ -209,8 +240,9 @@ final class IslandController {
 
     // MARK: - Dashboard
 
-    func openDashboard() {
+    func openDashboard(tab: IslandModel.Tab? = nil) {
         guard model.mode != .activity, model.mode != .open else { return }
+        if let tab { model.tab = tab }
         closeWork?.cancel()
         setMode(.open, .spring(response: 0.42, dampingFraction: 0.76))
         haptic()

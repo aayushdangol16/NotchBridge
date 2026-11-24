@@ -3,13 +3,17 @@ import AppKit
 /// Watches the pointer without needing Accessibility permission: a 20 Hz position poll (plus local
 /// move events over our own panel), clicks anywhere (to close the dashboard), and scroll gestures.
 final class HoverTracker {
-    var onMove: (CGPoint) -> Void = { _ in }
+    /// Pointer position and whether a file drag (Finder etc.) is in progress.
+    var onMove: (CGPoint, Bool) -> Void = { _, _ in }
     var onMouseDownOutside: (CGPoint) -> Void = { _ in }
     var onScroll: (NSEvent) -> Void = { _ in }
 
     private var monitors: [Any] = []
     private var poll: Timer?
     private var lastPoint = CGPoint(x: -1, y: -1)
+    private var lastFileDrag = false
+    private var wasPressed = false
+    private var dragBaseline = NSPasteboard(name: .drag).changeCount
 
     func start() {
         // Pointer position is polled (cheap: one read, 20×/s) rather than taken from a global
@@ -41,9 +45,21 @@ final class HoverTracker {
 
     private func tick() {
         let p = NSEvent.mouseLocation
-        guard p != lastPoint else { return }
+        // A file drag = left button held + the drag pasteboard changed since the button went down
+        // and it carries file URLs. (Only touched while the button is down, so it's cheap.)
+        let pressed = NSEvent.pressedMouseButtons & 1 != 0
+        var fileDrag = false
+        if pressed {
+            let pb = NSPasteboard(name: .drag)
+            if pb.changeCount != dragBaseline { fileDrag = pb.types?.contains(.fileURL) ?? false }
+        } else if wasPressed {
+            dragBaseline = NSPasteboard(name: .drag).changeCount
+        }
+        wasPressed = pressed
+        guard p != lastPoint || fileDrag != lastFileDrag else { return }
         lastPoint = p
-        onMove(p)
+        lastFileDrag = fileDrag
+        onMove(p, fileDrag)
     }
 
     deinit {

@@ -86,6 +86,14 @@ enum Snapshot {
             ("16-meeting-card", model(.activity) { $0.notification = nil; $0.system = .meeting(events[0]) }),
             ("17-calendar-tab", model(.open) { $0.tab = .calendar }),
             ("18-home-next-event", model(.open)),
+            ("19-shelf-empty-drop", model(.open) { $0.tab = .shelf; $0.dropTargeted = true }),
+            ("20-shelf-items", model(.open) { m in
+                m.tab = .shelf
+                let paths = ["/Applications/Safari.app", "/System/Applications/Notes.app", "/System/Library/Desktop Pictures",
+                             "/System/Applications/Calculator.app"]
+                m.shelfItems = paths.map { ShelfItem(id: UUID(), path: $0, addedAt: Date()) }
+                m.transfers = [m.shelfItems[1].id: 0.62]
+            }),
             ("10-idle-live-music", model(.idle) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),
             ("11-peek-music", model(.peek) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),
             ("12-home-music", model(.open) { $0.media = song; $0.mediaAccent = AccentColor.from(albumArt) ?? AccentColor.fallback }),

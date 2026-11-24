@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import UniformTypeIdentifiers
 import ServiceManagement
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
@@ -11,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let media = MediaCenter()
     private let calendar = CalendarService()
     private let battery = BatteryMonitor()
+    private let shelf = ShelfStore()
+    private var transferItems: [String: UUID] = [:]   // transfer id -> shelf item
     private var cancellables = Set<AnyCancellable>()
     private let pairingWindow = PairingWindowController()
     private let systemNotifier = SystemNotifier()
@@ -29,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         server.start()
         wireMedia()
         wireCalendarAndBattery()
+        wireShelf()
 
         if Pairing.shared.pairedDevice == nil {
             pairingWindow.show()
@@ -88,6 +92,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             island.model.phoneRinging = m.on ?? false
         case "media":
             media.updatePhone(m.m)
+        case "file_result":
+            if let id = m.id, let item = transferItems.removeValue(forKey: id) {
+                island.model.transfers[item] = nil
+            }
+            let name = m.name.map { "“\($0)”" } ?? "File"
+            if m.ok == true {
+                island.toast("\(name) sent to your phone")
+            } else {
+                island.toast(m.msg ?? "The phone couldn't save \(name)", isError: true)
+            }
         default:
             break
         }
@@ -278,6 +292,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             .sink { [weak m] c in m?.mediaAccent = c }
             .store(in: &cancellables)
         media.start()
+    }
+
+    private func wireShelf() {
+        let m = island.model
+        shelf.$items.receive(on: DispatchQueue.main).sink { [weak m] items in m?.shelfItems = items }.store(in: &cancellables)
+        shelf.$thumbnails.receive(on: DispatchQueue.main).sink { [weak m] t in m?.shelfIcons = t }.store(in: &cancellables)
+        m.onDropFiles = { [weak self] urls in
+            guard let self else { return }
+            let added = self.shelf.add(urls)
+            if added > 0 { self.island.toast(added == 1 ? "Added to the shelf" : "Added \(added) files to the shelf") }
+        }
+        m.onShelfRemove = { [weak self] item in self?.shelf.remove(item) }
+        m.onShelfClear = { [weak self] in self?.shelf.clear() }
+        m.onShelfOpen = { item in NSWorkspace.shared.open(item.url) }
+        m.onShelfAirDrop = { items in
+            guard let service = NSSharingService(named: .sendViaAirDrop) else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            service.perform(withItems: items.map(\.url))
+        }
+        m.onShelfSendToPhone = { [weak self] item in self?.sendToPhone(item) }
+    }
+
+    private func sendToPhone(_ item: ShelfItem) {
+        guard case .connected = status else {
+            island.toast("Phone is not connected", isError: true)
+            return
+        }
+        guard island.model.transfers[item.id] == nil else { return }
+        let id = UUID().uuidString
+        transferItems[id] = item.id
+        island.model.transfers[item.id] = 0
+        let mime = UTType(filenameExtension: item.url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+        server.sendFile(item.url, id: id, mime: mime, progress: { [weak self] p in
+            guard let self, self.transferItems[id] != nil else { return }
+            self.island.model.transfers[item.id] = p
+            if p >= 1 {
+                // Everything sent; an up-to-date phone answers with file_result within moments.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+                    guard let self, self.transferItems.removeValue(forKey: id) != nil else { return }
+                    self.island.model.transfers[item.id] = nil
+                    self.island.toast("No answer from the phone. Update the phone app?", isError: true)
+                }
+            }
+        }, failed: { [weak self] msg in
+            self?.transferItems[id] = nil
+            self?.island.model.transfers[item.id] = nil
+            self?.island.toast(msg, isError: true)
+        })
     }
 
     private func wireCalendarAndBattery() {

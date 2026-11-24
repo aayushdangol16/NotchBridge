@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 private struct IslandSizeKey: PreferenceKey {
     static var defaultValue: CGSize = .zero
@@ -117,7 +118,16 @@ struct IslandView: View {
         // Idle: invisible — the hardware notch is the island. (On Macs without a notch, nothing at all.)
         .opacity(model.mode == .idle && !model.liveVisible ? 0 : 1)
         .scaleEffect(model.hovering && isCard && !model.expanded ? 1.025 : 1, anchor: .top)
+        .overlay {
+            // Drop highlight while a file is dragged over the island.
+            shape.stroke(Color.green.opacity(model.dropTargeted ? 0.85 : 0), lineWidth: 2)
+                .animation(.easeOut(duration: 0.15), value: model.dropTargeted)
+        }
         .contentShape(shape)
+        .onDrop(of: [.fileURL], isTargeted: $model.dropTargeted) { providers in
+            model.onDropProviders(providers)
+            return true
+        }
         .onTapGesture {
             if model.mode == .peek || model.mode == .idle { model.onOpenDashboard() }
         }
@@ -292,9 +302,10 @@ struct IslandView: View {
         HStack(spacing: 0) {
             HStack(spacing: 2) {
                 ForEach(IslandModel.Tab.allCases) { tab in
-                    ChromeButton(icon: tab.icon, title: model.tab == tab ? tab.title : nil, selected: model.tab == tab) {
+                    ChromeButton(icon: tab.icon, selected: model.tab == tab) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { model.tab = tab }
                     }
+                    .help(tab.title)
                 }
             }
             .padding(.leading, 9)

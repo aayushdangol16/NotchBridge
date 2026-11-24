@@ -75,6 +75,11 @@ The notch is now a small dynamic island:
 - **Mac battery:**
   - Plugging in shows a green "Charging" strip beside the camera with the battery filling up.
   - On battery, you get a red warning at 20% and again at 10%.
+- **Shelf:** drag any file toward the notch and the island opens on the **Shelf** tab. Drop the file to park it there; it's still there after a restart.
+  - Drag a file back out of the shelf into any app.
+  - Double-click a file to open it.
+  - Hover a file for **AirDrop** or **Send to phone**. Sending shows a progress ring; on the phone the file lands in **Downloads › NotchBridge** with a notification you can tap to open it.
+  - Use **AirDrop all** or **Clear** for everything. Removing a file from the shelf never deletes the file itself.
 - **Priorities:** phone notifications beat everything else. A meeting card that gets interrupted comes back afterwards. Battery strips never cover a phone card or the open dashboard.
 - **New phone notifications** peek out of the notch, then open into a card that stays for about 6 seconds (adjustable in Settings). Hovering keeps it open.
   - Click the card for **Reply**, the app's own action, and **Clear** (which also removes it from the phone).
@@ -90,6 +95,7 @@ The notch is now a small dynamic island:
 Developer checks:
 - `NotchBridge --selftest` runs the state-machine tests.
 - `NotchBridge --snapshot <dir>` renders every island state to PNG.
+- `NotchBridge --filetest <file>` serves on port 47899 and sends `<file>` to a test client. It's used with a fake phone to check transfers byte for byte.
 
 ## How it works
 

@@ -9,13 +9,14 @@ final class IslandModel: ObservableObject {
     /// Activities grow in two steps: a compact peek beside the camera, then the full card.
     enum Stage: Equatable { case compact, full }
     enum Tab: String, CaseIterable, Identifiable {
-        case home, phone, calendar
+        case home, phone, calendar, shelf
         var id: String { rawValue }
         var icon: String {
             switch self {
             case .home: return "house.fill"
             case .phone: return "iphone.gen3"
             case .calendar: return "calendar"
+            case .shelf: return "tray.full.fill"
             }
         }
         var title: String {
@@ -23,6 +24,7 @@ final class IslandModel: ObservableObject {
             case .home: return "Home"
             case .phone: return "Phone"
             case .calendar: return "Agenda"
+            case .shelf: return "Shelf"
             }
         }
     }
@@ -68,6 +70,13 @@ final class IslandModel: ObservableObject {
     @Published var events: [CalEvent] = []
     @Published var calendarAccess: CalendarAccess = .off
 
+    // Shelf
+    @Published var shelfItems: [ShelfItem] = []
+    @Published var shelfIcons: [UUID: NSImage] = [:]
+    @Published var transfers: [UUID: Double] = [:]   // shelf item -> send-to-phone progress 0…1
+    @Published var dropTargeted = false
+    @Published var fileDragActive = false
+
     // Phone tab interaction
     @Published var openRowKey: String?       // row showing full text + actions
     @Published var rowReplyKey: String?      // row with an inline reply field
@@ -93,6 +102,13 @@ final class IslandModel: ObservableObject {
     var onMedia: (MediaCommand) -> Void = { _ in }
     var onClearAll: () -> Void = {}
     var onJoin: (URL) -> Void = { _ in }
+    var onDropProviders: ([NSItemProvider]) -> Void = { _ in }
+    var onDropFiles: ([URL]) -> Void = { _ in }
+    var onShelfRemove: (ShelfItem) -> Void = { _ in }
+    var onShelfClear: () -> Void = {}
+    var onShelfOpen: (ShelfItem) -> Void = { _ in }
+    var onShelfAirDrop: ([ShelfItem]) -> Void = { _ in }
+    var onShelfSendToPhone: (ShelfItem) -> Void = { _ in }
     var onCalendarAccess: () -> Void = {}             // ask for access / open Privacy settings
     /// A text field in the dashboard wants focus: make the panel key and keep the dashboard open.
     var onNeedKeyboard: () -> Void = {}

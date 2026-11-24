@@ -43,16 +43,24 @@ struct PhoneMessage: Decodable {
     let charging: Bool?         // battery
     let on: Bool?               // ringing (find my phone)
     let m: WireMedia?           // media: what's playing on the phone
+    let id: String?             // file_result: transfer id
+    let name: String?           // file_result: saved file name
 }
 
 /// Mac -> Phone
 struct MacCommand: Encodable {
-    let type: String            // welcome | dismiss | action | reply | ring | ring_stop | media_cmd
+    let type: String            // welcome | dismiss | action | reply | ring | ring_stop | media_cmd | file_*
     var key: String? = nil
     var i: Int? = nil
     var text: String? = nil
     var name: String? = nil
     var cmd: String? = nil      // media_cmd: toggle | next | prev
+    // file_begin / file_chunk / file_end
+    var id: String? = nil
+    var size: Int64? = nil
+    var mime: String? = nil
+    var seq: Int? = nil
+    var data: String? = nil     // base64 chunk
 }
 
 // MARK: - App model

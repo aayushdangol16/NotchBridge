@@ -7,6 +7,7 @@ class NotchBridgeApp : Application() {
         super.onCreate()
         BridgeService.createChannel(this)
         PhoneFinder.createChannel(this)
+        FileReceiver.createChannel(this)
         Bridge.init(this)
         Bridge.start()
     }

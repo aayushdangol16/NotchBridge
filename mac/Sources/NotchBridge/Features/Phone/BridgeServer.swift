@@ -24,6 +24,14 @@ final class BridgeServer {
     private var phone: NWConnection?
     private var unauthenticated: [ObjectIdentifier: NWConnection] = [:]
     private var status: Status = .starting
+    private let port: UInt16
+    private let advertise: Bool
+
+    /// `advertise: false` + another port = a private instance (used by --filetest).
+    init(port: UInt16 = Pairing.port, advertise: Bool = true) {
+        self.port = port
+        self.advertise = advertise
+    }
 
     func start() {
         queue.async { self.startListener() }
@@ -61,15 +69,17 @@ final class BridgeServer {
         params.defaultProtocolStack.applicationProtocols.insert(ws, at: 0)
 
         do {
-            let l = try NWListener(using: params, on: NWEndpoint.Port(rawValue: Pairing.port)!)
-            let txt = NWTXTRecord(["id": pairing.macId])
-            l.service = NWListener.Service(name: pairing.macName, type: Self.serviceType, domain: nil, txtRecord: txt)
+            let l = try NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
+            if advertise {
+                let txt = NWTXTRecord(["id": pairing.macId])
+                l.service = NWListener.Service(name: pairing.macName, type: Self.serviceType, domain: nil, txtRecord: txt)
+            }
             l.stateUpdateHandler = { [weak self] state in self?.listenerState(state) }
             l.newConnectionHandler = { [weak self] conn in self?.accept(conn) }
             listener = l
             l.start(queue: queue)
         } catch {
-            setStatus(.failed("Could not open port \(Pairing.port): \(error.localizedDescription)"))
+            setStatus(.failed("Could not open port \(port): \(error.localizedDescription)"))
             retryListener()
         }
     }
@@ -165,12 +175,70 @@ final class BridgeServer {
         DispatchQueue.main.async { self.onMessage?(message) }
     }
 
-    private func send(_ command: MacCommand, on conn: NWConnection) {
+    private func send(_ command: MacCommand, on conn: NWConnection, sent: ((Error?) -> Void)? = nil) {
         guard let json = try? JSONEncoder().encode(command),
-              let box = try? pairing.seal(json) else { return }
+              let box = try? pairing.seal(json) else { sent?(CocoaError(.coderInvalidValue)); return }
         let meta = NWProtocolWebSocket.Metadata(opcode: .binary)
         let ctx = NWConnection.ContentContext(identifier: "cmd", metadata: [meta])
-        conn.send(content: box, contentContext: ctx, isComplete: true, completion: .contentProcessed { _ in })
+        conn.send(content: box, contentContext: ctx, isComplete: true, completion: .contentProcessed { error in
+            sent?(error)
+        })
+    }
+
+    // MARK: - File transfer (Mac -> phone)
+
+    static let chunkSize = 192 * 1024
+
+    /// Streams a file to the phone: file_begin, file_chunk… (each sent after the previous one left),
+    /// file_end. The phone answers with "file_result". Callbacks on the main queue.
+    func sendFile(_ url: URL, id: String, mime: String,
+                  progress: @escaping (Double) -> Void,
+                  failed: @escaping (String) -> Void) {
+        queue.async {
+            guard let phone = self.phone else {
+                DispatchQueue.main.async { failed("Phone is not connected") }
+                return
+            }
+            guard let handle = try? FileHandle(forReadingFrom: url) else {
+                DispatchQueue.main.async { failed("Couldn't read \(url.lastPathComponent)") }
+                return
+            }
+            let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int64) ?? 0
+            self.send(MacCommand(type: "file_begin", name: url.lastPathComponent, id: id, size: size, mime: mime), on: phone)
+
+            var seq = 0
+            var sentBytes: Int64 = 0
+            func next() {
+                guard self.phone === phone else {
+                    try? handle.close()
+                    DispatchQueue.main.async { failed("Phone disconnected during the transfer") }
+                    return
+                }
+                let chunk = (try? handle.read(upToCount: Self.chunkSize)) ?? Data()
+                if chunk.isEmpty {
+                    try? handle.close()
+                    self.send(MacCommand(type: "file_end", id: id), on: phone)
+                    DispatchQueue.main.async { progress(1) }
+                    return
+                }
+                let cmd = MacCommand(type: "file_chunk", id: id, seq: seq, data: chunk.base64EncodedString())
+                seq += 1
+                self.send(cmd, on: phone) { error in
+                    self.queue.async {
+                        if let error {
+                            try? handle.close()
+                            DispatchQueue.main.async { failed("Transfer failed: \(error.localizedDescription)") }
+                            return
+                        }
+                        sentBytes += Int64(chunk.count)
+                        let fraction = size > 0 ? Double(sentBytes) / Double(size) : 1
+                        DispatchQueue.main.async { progress(min(fraction, 0.99)) }
+                        next()
+                    }
+                }
+            }
+            next()
+        }
     }
 
     private func close(_ conn: NWConnection, code: UInt16) {

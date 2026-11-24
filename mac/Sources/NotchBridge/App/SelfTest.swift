@@ -164,6 +164,35 @@ enum SelfTest {
         m.onCloseActivity(); spin(0.7)
         check("nothing left over", m.mode == .idle && m.system == nil && m.notification == nil)
 
+        // --- Phase 5: shelf store + drag to notch ---
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("nb-selftest-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        let f1 = tmp.appendingPathComponent("report.pdf"), f2 = tmp.appendingPathComponent("photo.jpg")
+        FileManager.default.createFile(atPath: f1.path, contents: Data("a".utf8))
+        FileManager.default.createFile(atPath: f2.path, contents: Data("b".utf8))
+        let shelf = ShelfStore(directory: tmp)
+        check("shelf adds files", shelf.add([f1, f2]) == 2 && shelf.items.count == 2)
+        check("shelf skips duplicates", shelf.add([f1]) == 0 && shelf.items.count == 2)
+        check("newest first", shelf.items.first?.name == "photo.jpg")
+        check("shelf persists", ShelfStore(directory: tmp).items.map(\.name) == ["photo.jpg", "report.pdf"])
+        try? FileManager.default.removeItem(at: f2)
+        check("missing files dropped on load", ShelfStore(directory: tmp).items.map(\.name) == ["report.pdf"])
+        shelf.remove(shelf.items[0])
+        check("remove", shelf.items.count == 1)
+
+        c.pointerMoved(far); spin(0.4)
+        let nearNotch = CGPoint(x: c.dragZone.maxX - 20, y: c.dragZone.minY + 8)
+        c.pointerMoved(nearNotch, fileDrag: false); spin(0.3)
+        check("plain pointer beside the notch does nothing", m.mode == .idle)
+        c.pointerMoved(nearNotch, fileDrag: true); spin(0.4)
+        check("dragging a file toward the notch opens the Shelf", m.mode == .open && m.tab == .shelf && m.fileDragActive)
+        c.pointerMoved(far, fileDrag: true); spin(0.8)
+        check("dashboard stays open while the file is still being dragged", m.mode == .open)
+        c.pointerMoved(far, fileDrag: false); spin(0.8)
+        check("drag ends away from the notch -> closes", m.mode == .idle && !m.fileDragActive)
+        m.tab = .home
+
         print(failures.n == 0 ? "ALL PASSED" : "\(failures.n) FAILED")
         return failures.n == 0 ? 0 : 1
     }
